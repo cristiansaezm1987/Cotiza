@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
-import puppeteer from 'puppeteer-extra';
-import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 
-puppeteer.use(StealthPlugin());
+export const maxDuration = 60; // Allow longer execution times
 
 export async function GET(request) {
+  const isVercel = process.env.VERCEL === "1" || !!process.env.VERCEL;
+  const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+  const stealth = StealthPlugin.default ? StealthPlugin.default() : StealthPlugin();
+
   const searchParams = request.nextUrl.searchParams;
   const code = searchParams.get('id');
 
@@ -14,10 +16,33 @@ export async function GET(request) {
 
   let browser;
   try {
-    browser = await puppeteer.launch({
-      headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security'],
-    });
+    if (isVercel) {
+      const puppeteerCore = require('puppeteer-core');
+      const { addExtra } = require('puppeteer-extra');
+      const chromium = require('@sparticuz/chromium-min');
+      
+      const puppeteerExtraVercel = addExtra(puppeteerCore);
+      puppeteerExtraVercel.use(stealth);
+
+      browser = await puppeteerExtraVercel.launch({
+        args: [...chromium.args, '--hide-scrollbars', '--disable-web-security'],
+        defaultViewport: chromium.defaultViewport,
+        executablePath: await chromium.executablePath(
+          'https://github.com/Sparticuz/chromium/releases/download/v131.0.1/chromium-v131.0.1-pack.tar'
+        ),
+        headless: chromium.headless,
+        ignoreHTTPSErrors: true,
+      });
+    } else {
+      const puppeteerExtra = require('puppeteer-extra');
+      const puppeteer = puppeteerExtra.default || puppeteerExtra;
+      puppeteer.use(stealth);
+      
+      browser = await puppeteer.launch({
+        headless: 'new',
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security']
+      });
+    }
 
     const page = await browser.newPage();
     let interceptedData = null;
