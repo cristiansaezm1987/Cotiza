@@ -4,6 +4,7 @@ import Filters from './Filters';
 import DataTable from './DataTable';
 import RefreshButton from './RefreshButton';
 import DetailModal from './DetailModal';
+import ExcelUploader from './ExcelUploader';
 
 export default function Dashboard() {
   const [data, setData] = useState([]);
@@ -15,6 +16,8 @@ export default function Dashboard() {
   const [totalCount, setTotalCount] = useState(0);
   const [selectedItem, setSelectedItem] = useState(null);
 
+  const [excelData, setExcelData] = useState(null);
+
   const [filters, setFilters] = useState({
     search: '',
     status: '',
@@ -23,6 +26,7 @@ export default function Dashboard() {
   });
 
   const fetchData = async (currentPage = page, currentFilters = filters, accumulatedData = [], depth = 0) => {
+    if (excelData) return; // Disable API fetch if in Excel mode
     setIsLoading(true);
     if (depth === 0) setError(null);
     try {
@@ -66,42 +70,77 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    fetchData(1, filters);
+    if (!excelData) fetchData(1, filters);
   }, []);
 
-  // Whenever filters change (except maxPrice), we reset page to 1 and fetch from backend
+  // Whenever filters change, reset page
   useEffect(() => {
     setPage(1);
-    // Debounce backend fetch slightly for typing search
+    if (excelData) return; // Excel mode handles this in its own effect
+
     const timer = setTimeout(() => {
       fetchData(1, filters);
     }, 500);
     return () => clearTimeout(timer);
   }, [filters.search, filters.region, filters.status, filters.callNumber]);
 
-  // Local filtering for price and callNumber
+  // Local filtering for both API mode and Excel mode
   useEffect(() => {
-    let result = data;
-    if (filters.callNumber) {
-      result = result.filter(item => item.callNumber === Number(filters.callNumber));
+    if (excelData) {
+      let result = excelData;
+      
+      if (filters.search) {
+        const searchLower = filters.search.toLowerCase();
+        result = result.filter(item => 
+          item.codigo.toLowerCase().includes(searchLower) || 
+          item.nombre.toLowerCase().includes(searchLower)
+        );
+      }
+      if (filters.status) {
+        const statusMap = { '2': 'Publicada', '3': 'Cerrada', '4': 'Adjudicada', '5': 'Cancelada', '6': 'Desierta' };
+        if (statusMap[filters.status]) {
+          result = result.filter(item => item.estado.toLowerCase().includes(statusMap[filters.status].toLowerCase()));
+        }
+      }
+      if (filters.callNumber) {
+        result = result.filter(item => item.callNumber === Number(filters.callNumber));
+      }
+      if (filters.maxPrice) {
+        result = result.filter(item => item.monto_disponible_CLP <= Number(filters.maxPrice));
+      }
+      
+      setTotalCount(result.length);
+      
+      const itemsPerPage = 15;
+      const startIndex = (page - 1) * itemsPerPage;
+      const paginated = result.slice(startIndex, startIndex + itemsPerPage);
+      
+      setFilteredData(paginated);
+      setData(paginated);
+    } else {
+      // API mode filtering
+      let result = data;
+      if (filters.callNumber) {
+        result = result.filter(item => item.callNumber === Number(filters.callNumber));
+      }
+      if (filters.maxPrice) {
+        result = result.filter(item => item.monto_disponible_CLP <= Number(filters.maxPrice) || item.price <= Number(filters.maxPrice));
+      }
+      setFilteredData(result);
     }
-    if (filters.maxPrice) {
-      result = result.filter(item => item.price <= Number(filters.maxPrice));
-    }
-    setFilteredData(result);
-  }, [data, filters.maxPrice, filters.callNumber]);
+  }, [data, excelData, filters, page]);
 
   const handleNextPage = () => {
       const nextPage = page + 1;
       setPage(nextPage);
-      fetchData(nextPage, filters);
+      if (!excelData) fetchData(nextPage, filters);
   };
 
   const handlePrevPage = () => {
       if (page > 1) {
           const prevPage = page - 1;
           setPage(prevPage);
-          fetchData(prevPage, filters);
+          if (!excelData) fetchData(prevPage, filters);
       }
   };
 
@@ -112,6 +151,7 @@ export default function Dashboard() {
         {error && <span style={{ color: 'var(--danger-color)', fontSize: '0.9rem' }}>{error}</span>}
       </div>
       
+      <ExcelUploader onDataLoaded={setExcelData} />
       <Filters filters={filters} setFilters={setFilters} />
       
       {isLoading ? (
