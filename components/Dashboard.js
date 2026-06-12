@@ -235,7 +235,7 @@ export default function Dashboard() {
              <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
                  {totalCount > 0 ? `Mostrando ${filteredData.length} resultados en esta página (Total en sistema: ${totalCount})` : 'No se encontraron resultados.'}
              </span>
-             <div style={{ display: 'flex', gap: '10px' }}>
+             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                  <button 
                     onClick={handlePrevPage} 
                     disabled={page === 1 || isLoading}
@@ -245,6 +245,9 @@ export default function Dashboard() {
                     }}>
                      Anterior
                  </button>
+                 <span style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.1)', borderRadius: '8px', color: 'var(--accent-color)', fontWeight: 'bold', minWidth: '100px', textAlign: 'center' }}>
+                    Página {page}
+                 </span>
                  <button 
                     onClick={handleNextPage} 
                     disabled={isLoading || ((filters.callNumber === '2' && excelData) ? (page * 15 >= totalCount) : data.length === 0)}
