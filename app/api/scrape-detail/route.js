@@ -6,6 +6,9 @@ export async function GET(request) {
   let browser;
   try {
     const isVercel = process.env.VERCEL === "1" || !!process.env.VERCEL;
+    require('is-plain-object');
+    require('clone-deep');
+    require('merge-deep');
     const StealthPlugin = require('puppeteer-extra-plugin-stealth');
     const stealth = StealthPlugin.default ? StealthPlugin.default() : StealthPlugin();
 
