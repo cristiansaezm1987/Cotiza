@@ -66,7 +66,7 @@ export default function Dashboard() {
       }
 
       if ((currentFilters.callNumber || currentFilters.region) && localFiltered.length < 5 && newData.length > 0 && depth < 10) {
-          return fetchData(currentPage + 1, currentFilters, combinedData, depth + 1);
+          return await fetchData(currentPage + 1, currentFilters, combinedData, depth + 1);
       }
 
       setData(combinedData);
