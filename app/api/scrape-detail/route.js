@@ -44,6 +44,7 @@ export async function GET(request) {
 
     const page = await browser.newPage();
     let interceptedData = null;
+    let adjuntosData = null;
 
     await page.setRequestInterception(true);
     
@@ -52,18 +53,46 @@ export async function GET(request) {
     });
 
     const responsePromise = new Promise(resolve => {
+        let fichaReceived = false;
+        let adjuntosReceived = false;
+        let fallbackTimeout = null;
+        
+        const checkDone = () => {
+            if (fichaReceived && adjuntosReceived) {
+                if (fallbackTimeout) clearTimeout(fallbackTimeout);
+                resolve();
+            }
+        };
+
         page.on('response', async (response) => {
           const url = response.url();
-          if (response.request().method() !== 'OPTIONS' && url.includes('action=ficha') && url.includes(code)) {
-            try {
-              const json = await response.json();
-              if (json && json.payload) {
-                interceptedData = json.payload;
+          if (response.request().method() !== 'OPTIONS') {
+            if (url.includes('action=ficha') && url.includes(code)) {
+              try {
+                const json = await response.json();
+                if (json && json.payload) {
+                  interceptedData = json.payload;
+                }
+              } catch (e) {
+                  console.error("Error parsing ficha JSON:", e);
+              } finally {
+                  fichaReceived = true;
+                  if (!fallbackTimeout) fallbackTimeout = setTimeout(resolve, 3000);
+                  checkDone();
               }
-            } catch (e) {
-                console.error("Error parsing JSON:", e);
-            } finally {
-                resolve();
+            }
+            if (url.includes('adjuntos-compra-agil/listar') && url.includes(code)) {
+              try {
+                const json = await response.json();
+                if (json && json.payload && json.payload.files) {
+                  adjuntosData = json.payload.files;
+                }
+              } catch (e) {
+                  console.error("Error parsing adjuntos JSON:", e);
+              } finally {
+                  adjuntosReceived = true;
+                  checkDone();
+              }
             }
           }
         });
@@ -80,6 +109,7 @@ export async function GET(request) {
     await browser.close();
 
     if (interceptedData) {
+      interceptedData.adjuntos = adjuntosData || [];
       return NextResponse.json({ success: true, data: interceptedData });
     } else {
       return NextResponse.json({ success: false, error: 'No pudimos interceptar los detalles.' }, { status: 500 });

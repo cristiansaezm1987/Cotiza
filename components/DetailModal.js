@@ -1,10 +1,25 @@
 import { useState, useEffect } from 'react';
-import { X, Package, MapPin, Building2, Calendar, FileText } from 'lucide-react';
+import { X, Package, MapPin, Building2, Calendar, FileText, Paperclip, Download } from 'lucide-react';
 
 export default function DetailModal({ item, onClose }) {
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [downloadingId, setDownloadingId] = useState(null);
+
+  const handleDownload = (file) => {
+      setDownloadingId(file.id);
+      const url = `/api/download-attachment?id=${file.id}&code=${details.codigo}&name=${encodeURIComponent(file.nombreArchivo)}`;
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.nombreArchivo;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      
+      // Clear visual feedback after 5 seconds since browser handles the download
+      setTimeout(() => setDownloadingId(null), 5000);
+  };
 
   useEffect(() => {
     async function fetchDetails() {
@@ -132,6 +147,45 @@ export default function DetailModal({ item, onClose }) {
                 <p style={{ color: 'var(--text-secondary)' }}>No hay productos listados.</p>
               )}
             </div>
+
+            {details.adjuntos && details.adjuntos.length > 0 && (
+              <div style={{ background: 'rgba(255,255,255,0.03)', padding: '20px', borderRadius: '12px', marginTop: '10px' }}>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 600, marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Paperclip size={20} /> Archivos Adjuntos ({details.adjuntos.length})
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {details.adjuntos.map((file, idx) => (
+                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.05)', padding: '12px 15px', borderRadius: '8px' }}>
+                      <span style={{ fontSize: '0.9rem', color: 'var(--text-primary)', wordBreak: 'break-word', paddingRight: '15px' }}>
+                        {file.nombreArchivo}
+                      </span>
+                      <button 
+                        onClick={() => handleDownload(file)}
+                        disabled={downloadingId === file.id}
+                        style={{ 
+                          display: 'flex', alignItems: 'center', gap: '6px', 
+                          padding: '8px 12px', background: 'var(--primary-color)', color: 'white', 
+                          border: 'none', borderRadius: '6px', cursor: downloadingId === file.id ? 'wait' : 'pointer',
+                          opacity: downloadingId === file.id ? 0.7 : 1, transition: '0.2s', minWidth: '130px', justifyContent: 'center'
+                        }}
+                      >
+                        {downloadingId === file.id ? (
+                          <>
+                            <div style={{ width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                            <span style={{ fontSize: '0.85rem' }}>Descargando...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Download size={16} />
+                            <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>Descargar</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
               <a 
