@@ -31,11 +31,10 @@ export async function GET(request) {
         ignoreHTTPSErrors: true,
       });
     } else {
-      const puppeteerExtra = require('puppeteer-extra');
-      const puppeteer = puppeteerExtra.default || puppeteerExtra;
-      puppeteer.use(stealth);
+      const puppeteerExtraLocal = addExtra(require('puppeteer'));
+      puppeteerExtraLocal.use(StealthPlugin());
       
-      browser = await puppeteer.launch({
+      browser = await puppeteerExtraLocal.launch({
         headless: 'new',
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security']
       });

@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Test API</title>
+</head>
+<body>
+<div id="out">Loading...</div>
+<script>
+fetch('https://api.buscador.mercadopublico.cl/compra-agil?page_number=1')
+  .then(r => r.json())
+  .then(d => {
+    document.getElementById('out').innerText = 'Success! Count: ' + d.payload.resultados.length;
+  })
+  .catch(e => {
+    document.getElementById('out').innerText = 'Error: ' + e.message;
+  });
+</script>
+</body>
+</html>
