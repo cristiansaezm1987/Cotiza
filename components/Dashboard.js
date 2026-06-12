@@ -158,28 +158,7 @@ export default function Dashboard() {
     if (filters.callNumber === '2' && excelData) {
       result = excelData;
     } else {
-      result = [...data]; // API mode uses the background-loaded data
-      
-      // Enriquecer los datos de la API (Primer Llamado) con la info extra del Excel (Bypass)
-      // Esto nos permite mostrar el Plazo de Entrega y Fecha de Cierre sin entrar al detalle.
-      if (excelData && excelData.length > 0) {
-        const excelMap = new Map();
-        for (const item of excelData) {
-          if (item.id) excelMap.set(item.id, item);
-        }
-        
-        result = result.map(item => {
-          const match = excelMap.get(item.id);
-          if (match) {
-            return {
-              ...item,
-              deliveryDays: match.deliveryDays !== 'N/A' ? match.deliveryDays : item.deliveryDays,
-              closeDate: match.closeDate || item.closeDate
-            };
-          }
-          return item;
-        });
-      }
+      result = data; // API mode uses the background-loaded data
     }
     
     if (filters.search) {

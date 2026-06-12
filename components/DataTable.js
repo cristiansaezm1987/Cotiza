@@ -1,4 +1,51 @@
+import React, { useState, useEffect } from 'react';
 import { Building2, MapPin, Calendar, DollarSign, Package } from 'lucide-react';
+
+function AsyncDeliveryDays({ item }) {
+  const [days, setDays] = useState(item.deliveryDays);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    // Si ya viene con un número real (ej. desde el Segundo Llamado o ya estaba en la API), lo usamos directo
+    if (typeof item.deliveryDays === 'number' || (typeof item.deliveryDays === 'string' && !isNaN(item.deliveryDays))) {
+      setDays(item.deliveryDays);
+      return;
+    }
+    
+    // Si no, obtenemos el detalle de esta tarjeta en específico
+    let isMounted = true;
+    setLoading(true);
+    fetch(`/api/scrape-detail?id=${item.id}`)
+      .then(r => r.json())
+      .then(data => {
+         if (isMounted && data.success && data.data && data.data.plazo_entrega) {
+            setDays(data.data.plazo_entrega);
+         } else if (isMounted) {
+            setDays('No especificado');
+         }
+      })
+      .catch(() => {
+         if (isMounted) setDays('Error');
+      })
+      .finally(() => {
+         if (isMounted) setLoading(false);
+      });
+      
+    return () => { isMounted = false; };
+  }, [item.id, item.deliveryDays]);
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '4px', alignSelf: 'flex-start' }}>
+      <Package size={14} />
+      <span>
+        <strong style={{fontWeight: 600}}>Plazo de entrega:</strong>{' '}
+        {loading ? <span style={{opacity: 0.7}}>Cargando...</span> : 
+          <span>{days}{typeof days === 'number' || (typeof days === 'string' && !isNaN(days)) ? ' días' : ''}</span>
+        }
+      </span>
+    </div>
+  );
+}
 
 export default function DataTable({ data, onRowClick, isLoading, isRefreshingExcel }) {
   if (isLoading) {
@@ -90,10 +137,7 @@ export default function DataTable({ data, onRowClick, isLoading, isRefreshingExc
                   <span><strong style={{fontWeight: 600}}>Cierre:</strong> {item.closeDate ? item.closeDate.replace(' ', ' a las ') : 'No indicado'}</span>
                 </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '4px', alignSelf: 'flex-start' }}>
-                <Package size={14} />
-                <span><strong style={{fontWeight: 600}}>Plazo de entrega:</strong> {item.deliveryDays}{typeof item.deliveryDays === 'number' || (typeof item.deliveryDays === 'string' && !isNaN(item.deliveryDays)) ? ' días' : ''}</span>
-              </div>
+              <AsyncDeliveryDays item={item} />
             </div>
           </div>
         </div>
