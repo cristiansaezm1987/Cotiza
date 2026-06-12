@@ -213,7 +213,7 @@ export default function Dashboard() {
           <h3 style={{ color: 'var(--accent-color)', marginBottom: '10px' }}>Bypass en progreso: Descargando datos ocultos...</h3>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '15px' }}>Esto puede tardar hasta 15 segundos debido a la encriptación de Mercado Público.</p>
           <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
-            <div className="loading-bar-inner" style={{ width: '50%', height: '100%', background: 'linear-gradient(90deg, var(--primary-color), var(--accent-color))', animation: 'progress 2s ease-in-out infinite' }}></div>
+            <div className="loading-bar-inner" style={{ width: '50%', height: '100%', background: 'linear-gradient(90deg, #00c6ff, var(--accent-color))', animation: 'progress 2s ease-in-out infinite' }}></div>
           </div>
         </div>
       )}
