@@ -38,17 +38,30 @@ export default function Dashboard() {
     setIsBackgroundLoading(true);
     let currentData = [...accumulatedData];
     
-    for (let p = startPage; p <= totalPages; p++) {
+    const BATCH_SIZE = 3; // 3 parallel requests to speed up safely on Vercel
+    for (let p = startPage; p <= totalPages; p += BATCH_SIZE) {
       try {
-        setBackgroundProgress({ current: p, total: totalPages });
-        const res = await fetch(`/api/scrape?page=${p}`);
-        const result = await res.json();
-        if (result.success && result.data) {
-          currentData = [...currentData, ...result.data];
-          setData(currentData); // Update data in real-time so UI reacts!
+        setBackgroundProgress({ current: Math.min(p + BATCH_SIZE - 1, totalPages), total: totalPages });
+        
+        const promises = [];
+        for (let i = 0; i < BATCH_SIZE && (p + i) <= totalPages; i++) {
+          promises.push(fetch(`/api/scrape?page=${p + i}`).then(r => r.json()).catch(() => null));
         }
+        
+        const results = await Promise.all(promises);
+        let batchHasData = false;
+        
+        for (let result of results) {
+          if (result && result.success && result.data) {
+            currentData = [...currentData, ...result.data];
+            batchHasData = true;
+          }
+        }
+        
+        if (batchHasData) setData(currentData);
+        
       } catch (e) {
-        console.error('Error fetching background page:', p, e);
+        console.error('Error in background batch fetching:', e);
       }
     }
     setIsBackgroundLoading(false);
