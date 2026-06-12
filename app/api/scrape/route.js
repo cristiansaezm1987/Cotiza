@@ -3,12 +3,12 @@ import { NextResponse } from 'next/server';
 export const maxDuration = 60; // Allow longer execution times
 
 export async function GET(request) {
-  const isVercel = process.env.VERCEL === "1" || !!process.env.VERCEL;
-  const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-  const stealth = StealthPlugin.default ? StealthPlugin.default() : StealthPlugin();
-
   let browser;
   try {
+    const isVercel = process.env.VERCEL === "1" || !!process.env.VERCEL;
+    const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+    const stealth = StealthPlugin.default ? StealthPlugin.default() : StealthPlugin();
+
     const searchParams = request.nextUrl.searchParams;
     const pageParam = searchParams.get('page') || '1';
     const regionParam = searchParams.get('region') || '';

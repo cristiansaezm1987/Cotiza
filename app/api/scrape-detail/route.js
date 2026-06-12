@@ -3,19 +3,18 @@ import { NextResponse } from 'next/server';
 export const maxDuration = 60; // Allow longer execution times
 
 export async function GET(request) {
-  const isVercel = process.env.VERCEL === "1" || !!process.env.VERCEL;
-  const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-  const stealth = StealthPlugin.default ? StealthPlugin.default() : StealthPlugin();
-
-  const searchParams = request.nextUrl.searchParams;
-  const code = searchParams.get('id');
-
-  if (!code) {
-    return NextResponse.json({ success: false, error: 'ID is required' }, { status: 400 });
-  }
-
   let browser;
   try {
+    const isVercel = process.env.VERCEL === "1" || !!process.env.VERCEL;
+    const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+    const stealth = StealthPlugin.default ? StealthPlugin.default() : StealthPlugin();
+
+    const searchParams = request.nextUrl.searchParams;
+    const code = searchParams.get('id');
+
+    if (!code) {
+      return NextResponse.json({ success: false, error: 'ID is required' }, { status: 400 });
+    }
     if (isVercel) {
       const puppeteerCore = require('puppeteer-core');
       const { addExtra } = require('puppeteer-extra');
