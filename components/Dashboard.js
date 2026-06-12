@@ -90,17 +90,26 @@ export default function Dashboard() {
   const handleRefreshAll = () => {
     setPage(1);
     fetchData(1, filters);
-    syncExcelData();
+    // Solo forzar recarga de Excel si ya estábamos en modo Segundo Llamado
+    if (filters.callNumber === '2') {
+      syncExcelData();
+    }
   };
 
   useEffect(() => {
     fetchData(1, filters);
-    syncExcelData();
+    // Ya NO sincronizamos el Excel al cargar, solo cuando el usuario lo pida
   }, []);
 
   // Whenever filters change, reset page
   useEffect(() => {
     setPage(1);
+    
+    // Si eligen Segundo Llamado y NO tenemos la data de Excel, iniciar descarga
+    if (filters.callNumber === '2' && !excelData) {
+      syncExcelData();
+    }
+
     // Debounce backend fetch slightly for typing search
     const timer = setTimeout(() => {
       fetchData(1, filters);
@@ -174,14 +183,23 @@ export default function Dashboard() {
           <RefreshButton onRefresh={handleRefreshAll} isLoading={isLoading || isRefreshingExcel} />
           {lastUpdate && (
             <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-              Última actualización: {lastUpdate}
-              {isRefreshingExcel && ' (Sincronizando Segundos Llamados...)'}
+              Última actualización Excel: {lastUpdate}
             </span>
           )}
         </div>
         {error && <span style={{ color: 'var(--danger-color)', fontSize: '0.9rem' }}>{error}</span>}
       </div>
       
+      {isRefreshingExcel && (
+        <div className="glass-panel" style={{ padding: '20px', textAlign: 'center', background: 'rgba(0, 198, 255, 0.1)', border: '1px solid var(--accent-color)' }}>
+          <h3 style={{ color: 'var(--accent-color)', marginBottom: '10px' }}>Bypass en progreso: Descargando datos ocultos...</h3>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '15px' }}>Esto puede tardar hasta 15 segundos debido a la encriptación de Mercado Público.</p>
+          <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
+            <div className="loading-bar-inner" style={{ width: '50%', height: '100%', background: 'linear-gradient(90deg, var(--primary-color), var(--accent-color))', animation: 'progress 2s ease-in-out infinite' }}></div>
+          </div>
+        </div>
+      )}
+
       <Filters filters={filters} setFilters={setFilters} />
       
       {isLoading ? (

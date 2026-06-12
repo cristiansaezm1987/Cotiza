@@ -61,7 +61,18 @@ export async function GET(req) {
     }
     
     const filePath = path.join(tempDir, excelFile);
-    const workbook = XLSX.readFile(filePath);
+    
+    let workbook;
+    for (let i = 0; i < 10; i++) {
+      try {
+        const buffer = fs.readFileSync(filePath);
+        workbook = XLSX.read(buffer, { type: 'buffer' });
+        break;
+      } catch (e) {
+        if (i === 9) throw new Error(`Could not read file after 10 retries: ${e.message}`);
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    }
     const firstSheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[firstSheetName];
     
