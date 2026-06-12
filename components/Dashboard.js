@@ -224,21 +224,14 @@ export default function Dashboard() {
 
       <Filters filters={filters} setFilters={setFilters} />
       
-      {isLoading ? (
-        <div className="glass-panel animate-fade-in" style={{ padding: '40px', textAlign: 'center' }}>
-          <div style={{ width: '40px', height: '40px', border: '3px solid rgba(255,255,255,0.1)', borderTopColor: 'var(--accent-color)', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 15px' }}></div>
-          <p style={{ color: 'var(--text-secondary)' }}>Obteniendo resultados en tiempo real...</p>
-        </div>
-      ) : (
-        <>
-          <DataTable 
-             data={filteredData} 
-             onRowClick={setSelectedItem} 
-             isLoading={isLoading} 
-             isRefreshingExcel={isRefreshingExcel}
-          />
-          
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
+      <DataTable 
+         data={filteredData} 
+         onRowClick={setSelectedItem} 
+         isLoading={isLoading} 
+         isRefreshingExcel={isRefreshingExcel}
+      />
+      
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
              <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
                  {totalCount > 0 ? `Mostrando ${filteredData.length} resultados en esta página (Total en sistema: ${totalCount})` : 'No se encontraron resultados.'}
              </span>
@@ -263,8 +256,7 @@ export default function Dashboard() {
                  </button>
              </div>
           </div>
-        </>
-      )}
+      </div>
 
       {selectedItem && (
         <DetailModal item={selectedItem} onClose={() => setSelectedItem(null)} />

@@ -1,9 +1,18 @@
 import { Building2, MapPin, Calendar, DollarSign, Package } from 'lucide-react';
 
 export default function DataTable({ data, onRowClick, isLoading, isRefreshingExcel }) {
+  if (isLoading) {
+    return (
+      <div className="glass-panel animate-fade-in" style={{ padding: '40px', textAlign: 'center' }}>
+        <div style={{ width: '40px', height: '40px', border: '3px solid rgba(255,255,255,0.1)', borderTopColor: 'var(--accent-color)', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 15px' }}></div>
+        <p style={{ color: 'var(--text-secondary)' }}>Buscando y filtrando resultados en tiempo real...</p>
+      </div>
+    );
+  }
+
   if (isRefreshingExcel && (!data || data.length === 0)) {
     return (
-      <div className="glass-panel" style={{ padding: '40px', textAlign: 'center' }}>
+      <div className="glass-panel animate-fade-in" style={{ padding: '40px', textAlign: 'center' }}>
         <div style={{ width: '40px', height: '40px', border: '3px solid rgba(255,255,255,0.1)', borderTopColor: 'var(--accent-color)', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 15px' }}></div>
         <p style={{ color: 'var(--text-secondary)' }}>Analizando miles de registros encriptados en segundo plano...</p>
       </div>
