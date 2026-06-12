@@ -26,6 +26,12 @@ export default function Dashboard() {
     maxPrice: ''
   });
 
+  const REGION_MAP = {
+    "15": "Arica", "1": "Tarapacá", "2": "Antofagasta", "3": "Atacama", "4": "Coquimbo",
+    "5": "Valparaíso", "13": "Metropolitana", "6": "O'Higgins", "7": "Maule", "16": "Ñuble",
+    "8": "Biobío", "9": "Araucanía", "14": "Los Ríos", "10": "Los Lagos", "11": "Aysén", "12": "Magallanes"
+  };
+
   const fetchData = async (currentPage = page, currentFilters = filters, accumulatedData = [], depth = 0) => {
     if (excelData) return; // Disable API fetch if in Excel mode
     setIsLoading(true);
@@ -54,8 +60,12 @@ export default function Dashboard() {
       if (currentFilters.callNumber) {
         localFiltered = localFiltered.filter(item => item.callNumber === Number(currentFilters.callNumber));
       }
+      if (currentFilters.region) {
+        const rName = REGION_MAP[currentFilters.region];
+        if (rName) localFiltered = localFiltered.filter(item => item.region && item.region.toLowerCase().includes(rName.toLowerCase()));
+      }
 
-      if (currentFilters.callNumber && localFiltered.length < 5 && newData.length > 0 && depth < 10) {
+      if ((currentFilters.callNumber || currentFilters.region) && localFiltered.length < 5 && newData.length > 0 && depth < 10) {
           return fetchData(currentPage + 1, currentFilters, combinedData, depth + 1);
       }
 
@@ -141,6 +151,10 @@ export default function Dashboard() {
       if (filters.maxPrice) {
         result = result.filter(item => item.price <= Number(filters.maxPrice));
       }
+      if (filters.region) {
+        const rName = REGION_MAP[filters.region];
+        if (rName) result = result.filter(item => item.region && item.region.toLowerCase().includes(rName.toLowerCase()));
+      }
       
       setTotalCount(result.length);
       
@@ -157,6 +171,10 @@ export default function Dashboard() {
       }
       if (filters.maxPrice) {
         result = result.filter(item => item.monto_disponible_CLP <= Number(filters.maxPrice) || item.price <= Number(filters.maxPrice));
+      }
+      if (filters.region) {
+        const rName = REGION_MAP[filters.region];
+        if (rName) result = result.filter(item => item.region && item.region.toLowerCase().includes(rName.toLowerCase()));
       }
       setFilteredData(result);
     }
