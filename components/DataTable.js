@@ -27,10 +27,15 @@ export default function DataTable({ data, onRowClick }) {
           onClick={() => onRowClick && onRowClick(item)}
           style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', animationDelay: `${(index % 10) * 0.05}s`, cursor: 'pointer', transition: 'transform 0.2s', ':hover': { transform: 'translateY(-5px)' } }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <span style={{ fontSize: '0.8rem', background: 'rgba(255,255,255,0.1)', padding: '4px 8px', borderRadius: '4px' }}>
-              ID: {item.id}
-            </span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.8rem', background: 'rgba(255,255,255,0.1)', padding: '4px 8px', borderRadius: '4px' }}>
+                ID: {item.id}
+              </span>
+              <span style={{ fontSize: '0.75rem', background: item.callNumber === 1 ? 'rgba(59, 130, 246, 0.2)' : 'rgba(245, 158, 11, 0.2)', color: item.callNumber === 1 ? '#60a5fa' : '#fbbf24', padding: '4px 8px', borderRadius: '4px', fontWeight: 600 }}>
+                {item.callNumber === 1 ? '1er Llamado' : '2do Llamado+'}
+              </span>
+            </div>
             <span style={{ fontSize: '0.8rem', fontWeight: 600, color: getStatusColor(item.statusName), display: 'flex', alignItems: 'center', gap: '4px' }}>
               <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: getStatusColor(item.statusName) }}></div>
               {item.statusName}

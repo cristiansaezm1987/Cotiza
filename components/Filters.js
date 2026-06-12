@@ -42,7 +42,14 @@ export default function Filters({ filters, setFilters }) {
           </select>
         </div>
 
-
+        <div className="filter-group">
+          <label className="input-label">Llamado</label>
+          <select name="callNumber" value={filters.callNumber || ''} onChange={handleChange} className="input-field" style={{ appearance: 'none' }}>
+            <option value="">Todos los Llamados</option>
+            <option value="1">Primer Llamado</option>
+            <option value="2">Segundo Llamado o más</option>
+          </select>
+        </div>
 
         <div>
           <label className="input-label">Región</label>

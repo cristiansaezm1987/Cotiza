@@ -45,7 +45,12 @@ export default function DetailModal({ item, onClose }) {
         ) : details ? (
           <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div>
-              <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{details.codigo}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{details.codigo}</span>
+                <span style={{ fontSize: '0.8rem', background: item.callNumber === 1 ? 'rgba(59, 130, 246, 0.2)' : 'rgba(245, 158, 11, 0.2)', color: item.callNumber === 1 ? '#60a5fa' : '#fbbf24', padding: '4px 8px', borderRadius: '4px', fontWeight: 600 }}>
+                  {item.callNumber === 1 ? '1er Llamado' : '2do Llamado+'}
+                </span>
+              </div>
               <h2 style={{ fontSize: '1.4rem', fontWeight: 600, marginTop: '8px', marginBottom: '16px' }}>{details.nombre}</h2>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '15px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
