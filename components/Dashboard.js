@@ -33,7 +33,7 @@ export default function Dashboard() {
   };
 
   const fetchData = async (currentPage = page, currentFilters = filters, accumulatedData = [], depth = 0) => {
-    if (excelData) return; // Disable API fetch if in Excel mode
+    if (currentFilters.callNumber === '2' && excelData) return; // Disable API fetch only if we are querying Segundo Llamado and have excelData
     setIsLoading(true);
     if (depth === 0) setError(null);
     try {
@@ -120,6 +120,10 @@ export default function Dashboard() {
       syncExcelData();
     }
 
+    if (filters.callNumber !== '2' || !excelData) {
+      setIsLoading(true);
+    }
+
     // Debounce backend fetch slightly for typing search
     const timer = setTimeout(() => {
       fetchData(1, filters);
@@ -129,7 +133,7 @@ export default function Dashboard() {
 
   // Local filtering for both API mode and Excel mode
   useEffect(() => {
-    if (excelData) {
+    if (filters.callNumber === '2' && excelData) {
       let result = excelData;
       
       if (filters.search) {
@@ -223,11 +227,16 @@ export default function Dashboard() {
       {isLoading ? (
         <div className="glass-panel animate-fade-in" style={{ padding: '40px', textAlign: 'center' }}>
           <div style={{ width: '40px', height: '40px', border: '3px solid rgba(255,255,255,0.1)', borderTopColor: 'var(--accent-color)', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 15px' }}></div>
-          <p style={{ color: 'var(--text-secondary)' }}>Obteniendo página {page} en tiempo real a través de Web Scraping...</p>
+          <p style={{ color: 'var(--text-secondary)' }}>Obteniendo resultados en tiempo real...</p>
         </div>
       ) : (
         <>
-          <DataTable data={filteredData} onRowClick={setSelectedItem} />
+          <DataTable 
+             data={filteredData} 
+             onRowClick={setSelectedItem} 
+             isLoading={isLoading} 
+             isRefreshingExcel={isRefreshingExcel}
+          />
           
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
              <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
@@ -245,10 +254,10 @@ export default function Dashboard() {
                  </button>
                  <button 
                     onClick={handleNextPage} 
-                    disabled={isLoading || (excelData ? (page * 15 >= totalCount) : data.length === 0)}
+                    disabled={isLoading || ((filters.callNumber === '2' && excelData) ? (page * 15 >= totalCount) : data.length === 0)}
                     style={{
                         padding: '8px 16px', background: 'var(--primary-color)', border: 'none',
-                        color: 'white', borderRadius: '8px', cursor: (isLoading || (excelData ? (page * 15 >= totalCount) : data.length === 0)) ? 'not-allowed' : 'pointer', opacity: (isLoading || (excelData ? (page * 15 >= totalCount) : data.length === 0)) ? 0.5 : 1
+                        color: 'white', borderRadius: '8px', cursor: (isLoading || ((filters.callNumber === '2' && excelData) ? (page * 15 >= totalCount) : data.length === 0)) ? 'not-allowed' : 'pointer', opacity: (isLoading || ((filters.callNumber === '2' && excelData) ? (page * 15 >= totalCount) : data.length === 0)) ? 0.5 : 1
                     }}>
                      Siguiente
                  </button>
