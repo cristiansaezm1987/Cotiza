@@ -256,8 +256,6 @@ export default function Dashboard() {
                  </button>
              </div>
           </div>
-      </div>
-
       {selectedItem && (
         <DetailModal item={selectedItem} onClose={() => setSelectedItem(null)} />
       )}
