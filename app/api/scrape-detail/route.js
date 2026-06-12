@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
+import puppeteerCore from 'puppeteer-core';
+import chromium from '@sparticuz/chromium-min';
+import { addExtra } from 'puppeteer-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 
-export const maxDuration = 60; // Allow longer execution times
+export const maxDuration = 60;
 
 export async function GET(request) {
   let browser;
@@ -14,10 +18,10 @@ export async function GET(request) {
       return NextResponse.json({ success: false, error: 'ID is required' }, { status: 400 });
     }
     if (isVercel) {
-      const puppeteerCore = require('puppeteer-core');
-      const chromium = require('@sparticuz/chromium-min').default || require('@sparticuz/chromium-min');
-      
-      browser = await puppeteerCore.launch({
+      const puppeteerExtraVercel = addExtra(puppeteerCore);
+      puppeteerExtraVercel.use(StealthPlugin());
+
+      browser = await puppeteerExtraVercel.launch({
         args: [...chromium.args, '--hide-scrollbars', '--disable-web-security'],
         defaultViewport: chromium.defaultViewport,
         executablePath: await chromium.executablePath(
