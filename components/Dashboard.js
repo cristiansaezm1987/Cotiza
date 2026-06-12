@@ -4,7 +4,6 @@ import Filters from './Filters';
 import DataTable from './DataTable';
 import RefreshButton from './RefreshButton';
 import DetailModal from './DetailModal';
-import ExcelUploader from './ExcelUploader';
 
 export default function Dashboard() {
   const [data, setData] = useState([]);
@@ -17,6 +16,8 @@ export default function Dashboard() {
   const [selectedItem, setSelectedItem] = useState(null);
 
   const [excelData, setExcelData] = useState(null);
+  const [lastUpdate, setLastUpdate] = useState(null);
+  const [isRefreshingExcel, setIsRefreshingExcel] = useState(false);
 
   const [filters, setFilters] = useState({
     search: '',
@@ -69,15 +70,38 @@ export default function Dashboard() {
     }
   };
 
+  // Automated Excel Sync
+  const syncExcelData = async () => {
+    setIsRefreshingExcel(true);
+    try {
+      const res = await fetch('/api/excel');
+      const result = await res.json();
+      if (result.success && result.data) {
+        setExcelData(result.data);
+        setLastUpdate(new Date().toLocaleString('es-CL'));
+      }
+    } catch (err) {
+      console.error('Error syncing Excel data:', err);
+    } finally {
+      setIsRefreshingExcel(false);
+    }
+  };
+
+  const handleRefreshAll = () => {
+    setPage(1);
+    fetchData(1, filters);
+    syncExcelData();
+  };
+
   useEffect(() => {
-    if (!excelData) fetchData(1, filters);
+    fetchData(1, filters);
+    syncExcelData();
   }, []);
 
   // Whenever filters change, reset page
   useEffect(() => {
     setPage(1);
-    if (excelData) return; // Excel mode handles this in its own effect
-
+    // Debounce backend fetch slightly for typing search
     const timer = setTimeout(() => {
       fetchData(1, filters);
     }, 500);
@@ -92,21 +116,21 @@ export default function Dashboard() {
       if (filters.search) {
         const searchLower = filters.search.toLowerCase();
         result = result.filter(item => 
-          item.codigo.toLowerCase().includes(searchLower) || 
-          item.nombre.toLowerCase().includes(searchLower)
+          (item.id && item.id.toLowerCase().includes(searchLower)) || 
+          (item.name && item.name.toLowerCase().includes(searchLower))
         );
       }
       if (filters.status) {
         const statusMap = { '2': 'Publicada', '3': 'Cerrada', '4': 'Adjudicada', '5': 'Cancelada', '6': 'Desierta' };
         if (statusMap[filters.status]) {
-          result = result.filter(item => item.estado.toLowerCase().includes(statusMap[filters.status].toLowerCase()));
+          result = result.filter(item => item.statusName && item.statusName.toLowerCase().includes(statusMap[filters.status].toLowerCase()));
         }
       }
       if (filters.callNumber) {
         result = result.filter(item => item.callNumber === Number(filters.callNumber));
       }
       if (filters.maxPrice) {
-        result = result.filter(item => item.monto_disponible_CLP <= Number(filters.maxPrice));
+        result = result.filter(item => item.price <= Number(filters.maxPrice));
       }
       
       setTotalCount(result.length);
@@ -116,7 +140,6 @@ export default function Dashboard() {
       const paginated = result.slice(startIndex, startIndex + itemsPerPage);
       
       setFilteredData(paginated);
-      setData(paginated);
     } else {
       // API mode filtering
       let result = data;
@@ -146,12 +169,19 @@ export default function Dashboard() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
-        <RefreshButton onRefresh={() => fetchData(page, filters)} isLoading={isLoading} />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px', background: 'rgba(0,0,0,0.2)', padding: '15px', borderRadius: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <RefreshButton onRefresh={handleRefreshAll} isLoading={isLoading || isRefreshingExcel} />
+          {lastUpdate && (
+            <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+              Última actualización: {lastUpdate}
+              {isRefreshingExcel && ' (Sincronizando Segundos Llamados...)'}
+            </span>
+          )}
+        </div>
         {error && <span style={{ color: 'var(--danger-color)', fontSize: '0.9rem' }}>{error}</span>}
       </div>
       
-      <ExcelUploader onDataLoaded={setExcelData} />
       <Filters filters={filters} setFilters={setFilters} />
       
       {isLoading ? (
@@ -179,10 +209,10 @@ export default function Dashboard() {
                  </button>
                  <button 
                     onClick={handleNextPage} 
-                    disabled={isLoading || data.length === 0}
+                    disabled={isLoading || (excelData ? (page * 15 >= totalCount) : data.length === 0)}
                     style={{
                         padding: '8px 16px', background: 'var(--primary-color)', border: 'none',
-                        color: 'white', borderRadius: '8px', cursor: (isLoading || data.length === 0) ? 'not-allowed' : 'pointer', opacity: (isLoading || data.length === 0) ? 0.5 : 1
+                        color: 'white', borderRadius: '8px', cursor: (isLoading || (excelData ? (page * 15 >= totalCount) : data.length === 0)) ? 'not-allowed' : 'pointer', opacity: (isLoading || (excelData ? (page * 15 >= totalCount) : data.length === 0)) ? 0.5 : 1
                     }}>
                      Siguiente
                  </button>

@@ -18,31 +18,61 @@ export default function ExcelUploader({ onDataLoaded }) {
       const workbook = XLSX.read(data, { type: 'array' });
       const firstSheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[firstSheetName];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+      
+      // Get all rows as arrays
+      const rawRows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+      
+      // Find the header row (the one containing 'ID' or 'Código')
+      let headerRowIndex = 0;
+      for (let i = 0; i < Math.min(20, rawRows.length); i++) {
+        const row = rawRows[i];
+        if (row && (row.includes('ID') || row.includes('Código') || row.includes('Nombre') || row.includes('Estado Convocatoria'))) {
+          headerRowIndex = i;
+          break;
+        }
+      }
+
+      const headers = rawRows[headerRowIndex];
+      const dataRows = rawRows.slice(headerRowIndex + 1);
 
       // Transform data to match our API format
-      const transformedData = jsonData.map(row => {
+      const transformedData = dataRows.map(row => {
+        // Helper to get value by header name
+        const getVal = (possibleNames) => {
+          for (let name of possibleNames) {
+            const index = headers.findIndex(h => h && h.toString().toLowerCase().trim() === name.toLowerCase());
+            if (index !== -1 && row[index] !== undefined && row[index] !== '') {
+              return row[index];
+            }
+          }
+          return '';
+        };
+
         let callNum = 1;
-        const estadoConvocatoria = (row['Estado Convocatoria'] || '').toString().toLowerCase();
+        const estadoConvocatoria = getVal(['Estado Convocatoria', 'Llamado']).toString().toLowerCase();
         if (estadoConvocatoria.includes('segundo') || estadoConvocatoria.includes('2')) {
             callNum = 2;
         }
 
+        const montoRaw = getVal(['Monto Disponible', 'Monto', 'Monto Estimado']);
+        // Strip all non-numeric characters (dots, commas, currency symbols) since CLP doesn't use decimals
+        const montoLimpio = typeof montoRaw === 'string' ? montoRaw.replace(/[^0-9]/g, '') : montoRaw;
+
         return {
-          id_interno: Math.random().toString(), // fake ID
-          codigo: row['ID'] || '',
-          nombre: row['Nombre'] || row['Nombre Licitación'] || '',
-          fecha_publicacion: row['Fecha de Publicación'] || row['Fecha Publicacion'] || '',
-          fecha_cierre: row['Fecha de cierre'] || row['Fecha Cierre'] || '',
-          organismo: row['Organismo'] || '',
-          unidad: row['Unidad'] || '',
-          estado: row['Estado'] || '',
-          monto_disponible_CLP: Number(row['Monto Disponible'] || 0),
-          moneda: row['Moneda'] || 'CLP',
+          id: getVal(['ID', 'Código', 'Codigo']),
+          name: getVal(['Nombre', 'Nombre Licitación']),
+          date: getVal(['Fecha de Publicación', 'Fecha Publicación', 'Fecha Publicacion', 'Publicacion']),
+          closeDate: getVal(['Fecha de cierre', 'Fecha Cierre', 'Cierre']),
+          organization: getVal(['Organismo', 'Institución', 'Comprador']),
+          region: getVal(['Región', 'Region', 'Unidad']) || 'No especificada', // Excel usually has Unidad, we can map it to region or leave default
+          statusName: getVal(['Estado']),
+          price: Number(montoLimpio || 0),
+          currency: getVal(['Moneda']) || 'CLP',
+          deliveryDays: getVal(['Días Entrega', 'Dias', 'Plazo']) || 'N/A',
           callNumber: callNum,
           _rawExcel: true
         };
-      });
+      }).filter(item => item.id); // Filter out empty rows at the end
 
       onDataLoaded(transformedData);
     } catch (error) {
