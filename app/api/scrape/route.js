@@ -108,7 +108,8 @@ export async function GET(request) {
         price: Number(item.monto_disponible_CLP) || Number(item.monto_estimado) || 0,
         organization: item.organismo,
         region: item.region || item.unidad || 'N/A', 
-        deliveryDays: item.dias_entrega || 1,
+        closeDate: item.fecha_cierre || null,
+        deliveryDays: item.dias_entrega || 'Ver detalle',
         callNumber: item.estado_convocatoria === 2 ? 2 : 1
       }));
 

@@ -79,14 +79,20 @@ export default function DataTable({ data, onRowClick, isLoading, isRefreshingExc
               <MapPin size={16} />
               <span>{item.region}</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Calendar size={16} />
-                <span>{item.date ? item.date.replace(' ', ' a las ') : 'Sin fecha'}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Calendar size={14} />
+                  <span><strong style={{fontWeight: 600}}>Pub:</strong> {item.date ? item.date.replace(' ', ' a las ') : 'Sin fecha'}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--danger-color)' }}>
+                  <Calendar size={14} />
+                  <span><strong style={{fontWeight: 600}}>Cierre:</strong> {item.closeDate ? item.closeDate.replace(' ', ' a las ') : 'No indicado'}</span>
+                </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '4px', alignSelf: 'flex-start' }}>
                 <Package size={14} />
-                <span>{item.deliveryDays} días</span>
+                <span><strong style={{fontWeight: 600}}>Plazo de entrega:</strong> {item.deliveryDays}{typeof item.deliveryDays === 'number' || (typeof item.deliveryDays === 'string' && !isNaN(item.deliveryDays)) ? ' días' : ''}</span>
               </div>
             </div>
           </div>
