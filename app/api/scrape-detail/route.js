@@ -6,11 +6,6 @@ export async function GET(request) {
   let browser;
   try {
     const isVercel = process.env.VERCEL === "1" || !!process.env.VERCEL;
-    require('is-plain-object');
-    require('clone-deep');
-    require('merge-deep');
-    const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-    const stealth = StealthPlugin.default ? StealthPlugin.default() : StealthPlugin();
 
     const searchParams = request.nextUrl.searchParams;
     const code = searchParams.get('id');
@@ -20,13 +15,9 @@ export async function GET(request) {
     }
     if (isVercel) {
       const puppeteerCore = require('puppeteer-core');
-      const { addExtra } = require('puppeteer-extra');
       const chromium = require('@sparticuz/chromium-min');
       
-      const puppeteerExtraVercel = addExtra(puppeteerCore);
-      puppeteerExtraVercel.use(stealth);
-
-      browser = await puppeteerExtraVercel.launch({
+      browser = await puppeteerCore.launch({
         args: [...chromium.args, '--hide-scrollbars', '--disable-web-security'],
         defaultViewport: chromium.defaultViewport,
         executablePath: await chromium.executablePath(
