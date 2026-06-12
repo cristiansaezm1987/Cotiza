@@ -28,6 +28,8 @@ export default function Dashboard() {
     maxPrice: ''
   });
 
+  const syncRef = useRef(false);
+
   const REGION_MAP = {
     "15": "Arica", "1": "Tarapacá", "2": "Antofagasta", "3": "Atacama", "4": "Coquimbo",
     "5": "Valparaíso", "13": "Metropolitana", "6": "O'Higgins", "7": "Maule", "16": "Ñuble",
@@ -41,14 +43,16 @@ export default function Dashboard() {
     const BATCH_SIZE = 3; // 3 parallel requests to speed up safely on Vercel
     for (let p = startPage; p <= totalPages; p += BATCH_SIZE) {
       try {
-        setBackgroundProgress({ current: Math.min(p + BATCH_SIZE - 1, totalPages), total: totalPages });
-        
         const promises = [];
         for (let i = 0; i < BATCH_SIZE && (p + i) <= totalPages; i++) {
           promises.push(fetch(`/api/scrape?page=${p + i}`).then(r => r.json()).catch(() => null));
         }
         
         const results = await Promise.all(promises);
+        
+        // Actualizar el progreso solo cuando el lote ha sido descargado exitosamente
+        setBackgroundProgress({ current: Math.min(p + BATCH_SIZE - 1, totalPages), total: totalPages });
+        
         let batchHasData = false;
         
         for (let result of results) {
@@ -130,7 +134,8 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    if (data.length === 0) {
+    if (data.length === 0 && !syncRef.current) {
+      syncRef.current = true;
       fetchData();
     }
     // Ya NO sincronizamos el Excel al cargar, solo cuando el usuario lo pida
