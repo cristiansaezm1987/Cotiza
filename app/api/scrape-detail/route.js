@@ -28,7 +28,7 @@ export async function GET(request) {
         args: [...chromium.args, '--hide-scrollbars', '--disable-web-security'],
         defaultViewport: chromium.defaultViewport,
         executablePath: await chromium.executablePath(
-          'https://github.com/Sparticuz/chromium/releases/download/v131.0.1/chromium-v131.0.1-pack.tar'
+          'https://github.com/Sparticuz/chromium/releases/download/v149.0.0/chromium-v149.0.0-pack.x64.tar'
         ),
         headless: chromium.headless,
         ignoreHTTPSErrors: true,
