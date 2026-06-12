@@ -22,9 +22,9 @@ export default function Dashboard() {
     maxPrice: ''
   });
 
-  const fetchData = async (currentPage = page, currentFilters = filters) => {
+  const fetchData = async (currentPage = page, currentFilters = filters, accumulatedData = [], depth = 0) => {
     setIsLoading(true);
-    setError(null);
+    if (depth === 0) setError(null);
     try {
       const query = new URLSearchParams({
           page: currentPage,
@@ -35,14 +35,31 @@ export default function Dashboard() {
       const res = await fetch(`/api/scrape?${query.toString()}`);
       const result = await res.json();
       
-      setData(result.data || []);
-      setTotalCount(result.totalCount || 0);
-      
       if (!result.success) {
-        setError(result.error || 'Error al conectar con el servidor de scraping.');
+        if (depth === 0) setError(result.error || 'Error al conectar con el servidor.');
+        setIsLoading(false);
+        return;
       }
+
+      const newData = result.data || [];
+      const newTotal = result.totalCount || 0;
+      const combinedData = [...accumulatedData, ...newData];
+      
+      let localFiltered = combinedData;
+      if (currentFilters.callNumber) {
+        localFiltered = localFiltered.filter(item => item.callNumber === Number(currentFilters.callNumber));
+      }
+
+      if (currentFilters.callNumber && localFiltered.length < 5 && newData.length > 0 && depth < 10) {
+          return fetchData(currentPage + 1, currentFilters, combinedData, depth + 1);
+      }
+
+      setData(combinedData);
+      setTotalCount(newTotal);
+      if (currentPage !== page) setPage(currentPage);
+
     } catch (err) {
-      setError('Error al conectar con el servidor de scraping.');
+      if (depth === 0) setError('Error al conectar con el servidor.');
     } finally {
       setIsLoading(false);
     }
@@ -60,7 +77,7 @@ export default function Dashboard() {
       fetchData(1, filters);
     }, 500);
     return () => clearTimeout(timer);
-  }, [filters.search, filters.region, filters.status]);
+  }, [filters.search, filters.region, filters.status, filters.callNumber]);
 
   // Local filtering for price and callNumber
   useEffect(() => {
