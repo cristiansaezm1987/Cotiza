@@ -17,7 +17,7 @@ export async function GET(request) {
     
     if (isVercel) {
       const puppeteerCore = require('puppeteer-core');
-      const chromium = require('@sparticuz/chromium-min');
+      const chromium = require('@sparticuz/chromium-min').default || require('@sparticuz/chromium-min');
       
       browser = await puppeteerCore.launch({
         args: [...chromium.args, '--hide-scrollbars', '--disable-web-security'],
