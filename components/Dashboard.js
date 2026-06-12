@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
+import { Play, Pause } from 'lucide-react';
 import Filters from './Filters';
 import DataTable from './DataTable';
 import RefreshButton from './RefreshButton';
@@ -11,6 +12,8 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(false);
   const [isBackgroundLoading, setIsBackgroundLoading] = useState(false);
   const [backgroundProgress, setBackgroundProgress] = useState({ current: 0, total: 0 });
+  const [isSyncPaused, setIsSyncPaused] = useState(false);
+  const isSyncPausedRef = useRef(false);
   const [error, setError] = useState(null);
   
   const [page, setPage] = useState(1);
@@ -30,6 +33,10 @@ export default function Dashboard() {
 
   const syncRef = useRef(false);
 
+  useEffect(() => {
+    isSyncPausedRef.current = isSyncPaused;
+  }, [isSyncPaused]);
+
   const REGION_MAP = {
     "15": "Arica", "1": "Tarapacá", "2": "Antofagasta", "3": "Atacama", "4": "Coquimbo",
     "5": "Valparaíso", "13": "Metropolitana", "6": "O'Higgins", "7": "Maule", "16": "Ñuble",
@@ -41,7 +48,15 @@ export default function Dashboard() {
     let currentData = [...accumulatedData];
     
     const BATCH_SIZE = 5; // 5 parallel requests to speed up safely on Vercel
-    for (let p = startPage; p <= totalPages; p += BATCH_SIZE) {
+    let p = startPage;
+    
+    while (p <= totalPages) {
+      if (isSyncPausedRef.current) {
+        // Pausar iteración verificando el semáforo cada 500ms sin perder progreso
+        await new Promise(r => setTimeout(r, 500));
+        continue;
+      }
+      
       try {
         const promises = [];
         for (let i = 0; i < BATCH_SIZE && (p + i) <= totalPages; i++) {
@@ -50,7 +65,6 @@ export default function Dashboard() {
         
         const results = await Promise.all(promises);
         
-        // Actualizar el progreso solo cuando el lote ha sido descargado exitosamente
         setBackgroundProgress({ current: Math.min(p + BATCH_SIZE - 1, totalPages), total: totalPages });
         
         let batchHasData = false;
@@ -67,7 +81,10 @@ export default function Dashboard() {
       } catch (e) {
         console.error('Error in background batch fetching:', e);
       }
+      
+      p += BATCH_SIZE;
     }
+    
     setIsBackgroundLoading(false);
   };
 
@@ -221,17 +238,34 @@ export default function Dashboard() {
       </div>
       
       {isBackgroundLoading && (
-        <div className="glass-panel animate-fade-in" style={{ padding: '15px 20px', display: 'flex', alignItems: 'center', gap: '15px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid var(--accent-color)' }}>
-          <div style={{ width: '20px', height: '20px', border: '2px solid rgba(255,255,255,0.2)', borderTopColor: 'var(--accent-color)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+        <div className="glass-panel animate-fade-in" style={{ padding: '15px 20px', display: 'flex', alignItems: 'center', gap: '15px', background: isSyncPaused ? 'rgba(245, 158, 11, 0.1)' : 'rgba(59, 130, 246, 0.1)', border: `1px solid ${isSyncPaused ? '#f59e0b' : 'var(--accent-color)'}` }}>
+          {!isSyncPaused && <div style={{ width: '20px', height: '20px', border: '2px solid rgba(255,255,255,0.2)', borderTopColor: 'var(--accent-color)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>}
+          {isSyncPaused && <div style={{ width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Pause size={18} color="#f59e0b" /></div>}
+          
           <div style={{ flex: 1 }}>
              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                 <span style={{ fontSize: '0.9rem', color: 'var(--accent-color)', fontWeight: 'bold' }}>Sincronización Profunda en Progreso...</span>
+                 <span style={{ fontSize: '0.9rem', color: isSyncPaused ? '#f59e0b' : 'var(--accent-color)', fontWeight: 'bold' }}>
+                    {isSyncPaused ? 'Sincronización Profunda Pausada' : 'Sincronización Profunda en Progreso...'}
+                 </span>
                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Página {backgroundProgress.current} de {backgroundProgress.total} ({backgroundProgress.total > 0 ? Math.round((backgroundProgress.current / backgroundProgress.total) * 100) : 0}%)</span>
              </div>
              <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
-                 <div style={{ width: `${(backgroundProgress.current / backgroundProgress.total) * 100}%`, height: '100%', background: 'var(--accent-color)', transition: 'width 0.3s' }}></div>
+                 <div style={{ width: `${(backgroundProgress.current / backgroundProgress.total) * 100}%`, height: '100%', background: isSyncPaused ? '#f59e0b' : 'var(--accent-color)', transition: 'width 0.3s' }}></div>
              </div>
           </div>
+
+          <button 
+             onClick={() => setIsSyncPaused(!isSyncPaused)}
+             style={{ 
+                 background: isSyncPaused ? '#10b981' : 'rgba(255,255,255,0.1)', 
+                 border: 'none', borderRadius: '50%', width: '36px', height: '36px', 
+                 display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                 color: 'white', transition: '0.2s'
+             }}
+             title={isSyncPaused ? "Reanudar" : "Pausar"}
+          >
+             {isSyncPaused ? <Play size={18} fill="currentColor" /> : <Pause size={18} fill="currentColor" />}
+          </button>
         </div>
       )}
 
