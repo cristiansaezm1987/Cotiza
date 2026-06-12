@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Filters from './Filters';
 import DataTable from './DataTable';
 import RefreshButton from './RefreshButton';
