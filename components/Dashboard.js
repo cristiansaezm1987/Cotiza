@@ -9,6 +9,8 @@ export default function Dashboard() {
   const [data, setData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isBackgroundLoading, setIsBackgroundLoading] = useState(false);
+  const [backgroundProgress, setBackgroundProgress] = useState({ current: 0, total: 0 });
   const [error, setError] = useState(null);
   
   const [page, setPage] = useState(1);
@@ -32,49 +34,57 @@ export default function Dashboard() {
     "8": "Biobío", "9": "Araucanía", "14": "Los Ríos", "10": "Los Lagos", "11": "Aysén", "12": "Magallanes"
   };
 
-  const fetchData = async (currentPage = page, currentFilters = filters, accumulatedData = [], depth = 0) => {
-    if (currentFilters.callNumber === '2' && excelData) return; // Disable API fetch only if we are querying Segundo Llamado and have excelData
-    setIsLoading(true);
-    if (depth === 0) setError(null);
+  const fetchAllRemainingPages = async (startPage, totalPages, accumulatedData) => {
+    setIsBackgroundLoading(true);
+    let currentData = [...accumulatedData];
+    
+    for (let p = startPage; p <= totalPages; p++) {
+      try {
+        setBackgroundProgress({ current: p, total: totalPages });
+        const res = await fetch(`/api/scrape?page=${p}`);
+        const result = await res.json();
+        if (result.success && result.data) {
+          currentData = [...currentData, ...result.data];
+          setData(currentData); // Update data in real-time so UI reacts!
+        }
+      } catch (e) {
+        console.error('Error fetching background page:', p, e);
+      }
+    }
+    setIsBackgroundLoading(false);
+  };
+
+  const fetchData = async () => {
+    if (filters.callNumber === '2' && excelData) return; // Disable API fetch only if we are querying Segundo Llamado and have excelData
+    
+    // Solo mostramos loader bloqueante si no tenemos data previa
+    if (data.length === 0) setIsLoading(true);
+    setError(null);
     try {
-      const query = new URLSearchParams({
-          page: currentPage,
-          region: currentFilters.region || '',
-          search: currentFilters.search || '',
-          status: currentFilters.status || ''
-      });
-      const res = await fetch(`/api/scrape?${query.toString()}`);
+      // Siempre traemos la página 1 sin filtros para llenar la base local
+      const res = await fetch(`/api/scrape?page=1`);
       const result = await res.json();
       
       if (!result.success) {
-        if (depth === 0) setError(result.error || 'Error al conectar con el servidor.');
+        setError(result.error || 'Error al conectar con el servidor.');
         setIsLoading(false);
         return;
       }
 
       const newData = result.data || [];
       const newTotal = result.totalCount || 0;
-      const combinedData = [...accumulatedData, ...newData];
       
-      let localFiltered = combinedData;
-      if (currentFilters.callNumber) {
-        localFiltered = localFiltered.filter(item => item.callNumber === Number(currentFilters.callNumber));
-      }
-      if (currentFilters.region) {
-        const rName = REGION_MAP[currentFilters.region];
-        if (rName) localFiltered = localFiltered.filter(item => item.region && item.region.toLowerCase().includes(rName.toLowerCase()));
-      }
-
-      if ((currentFilters.callNumber || currentFilters.region) && localFiltered.length < 5 && newData.length > 0 && depth < 10) {
-          return await fetchData(currentPage + 1, currentFilters, combinedData, depth + 1);
-      }
-
-      setData(combinedData);
+      setData(newData);
       setTotalCount(newTotal);
-      if (currentPage !== page) setPage(currentPage);
+
+      // Si hay más páginas, iniciar descarga silenciosa
+      const totalPages = Math.ceil(newTotal / 15);
+      if (totalPages > 1) {
+        fetchAllRemainingPages(2, totalPages, newData);
+      }
 
     } catch (err) {
-      if (depth === 0) setError('Error al conectar con el servidor.');
+      setError('Error al conectar con el servidor.');
     } finally {
       setIsLoading(false);
     }
@@ -107,7 +117,9 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    fetchData(1, filters);
+    if (data.length === 0) {
+      fetchData();
+    }
     // Ya NO sincronizamos el Excel al cargar, solo cuando el usuario lo pida
   }, []);
 
@@ -119,82 +131,60 @@ export default function Dashboard() {
     if (filters.callNumber === '2' && !excelData) {
       syncExcelData();
     }
-
-    if (filters.callNumber !== '2' || !excelData) {
-      setIsLoading(true);
-    }
-
-    // Debounce backend fetch slightly for typing search
-    const timer = setTimeout(() => {
-      fetchData(1, filters);
-    }, 500);
-    return () => clearTimeout(timer);
   }, [filters.search, filters.region, filters.status, filters.callNumber]);
 
   // Local filtering for both API mode and Excel mode
   useEffect(() => {
+    let result = [];
+    
     if (filters.callNumber === '2' && excelData) {
-      let result = excelData;
-      
-      if (filters.search) {
-        const searchLower = filters.search.toLowerCase();
-        result = result.filter(item => 
-          (item.id && item.id.toLowerCase().includes(searchLower)) || 
-          (item.name && item.name.toLowerCase().includes(searchLower))
-        );
-      }
-      if (filters.status) {
-        const statusMap = { '2': 'Publicada', '3': 'Cerrada', '4': 'Adjudicada', '5': 'Cancelada', '6': 'Desierta' };
-        if (statusMap[filters.status]) {
-          result = result.filter(item => item.statusName && item.statusName.toLowerCase().includes(statusMap[filters.status].toLowerCase()));
-        }
-      }
-      if (filters.callNumber) {
-        result = result.filter(item => item.callNumber === Number(filters.callNumber));
-      }
-      if (filters.maxPrice) {
-        result = result.filter(item => item.price <= Number(filters.maxPrice));
-      }
-      if (filters.region) {
-        const rName = REGION_MAP[filters.region];
-        if (rName) result = result.filter(item => item.region && item.region.toLowerCase().includes(rName.toLowerCase()));
-      }
-      
-      setTotalCount(result.length);
-      
-      const itemsPerPage = 15;
-      const startIndex = (page - 1) * itemsPerPage;
-      const paginated = result.slice(startIndex, startIndex + itemsPerPage);
-      
-      setFilteredData(paginated);
+      result = excelData;
     } else {
-      // API mode filtering
-      let result = data;
-      if (filters.callNumber) {
-        result = result.filter(item => item.callNumber === Number(filters.callNumber));
-      }
-      if (filters.maxPrice) {
-        result = result.filter(item => item.monto_disponible_CLP <= Number(filters.maxPrice) || item.price <= Number(filters.maxPrice));
-      }
-      if (filters.region) {
-        const rName = REGION_MAP[filters.region];
-        if (rName) result = result.filter(item => item.region && item.region.toLowerCase().includes(rName.toLowerCase()));
-      }
-      setFilteredData(result);
+      result = data; // API mode uses the background-loaded data
     }
+    
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      result = result.filter(item => 
+        (item.id && item.id.toLowerCase().includes(searchLower)) || 
+        (item.name && item.name.toLowerCase().includes(searchLower))
+      );
+    }
+    if (filters.status) {
+      const statusMap = { '2': 'Publicada', '3': 'Cerrada', '4': 'Adjudicada', '5': 'Cancelada', '6': 'Desierta' };
+      if (statusMap[filters.status]) {
+        result = result.filter(item => item.statusName && item.statusName.toLowerCase().includes(statusMap[filters.status].toLowerCase()));
+      }
+    }
+    if (filters.callNumber) {
+      result = result.filter(item => item.callNumber === Number(filters.callNumber));
+    }
+    if (filters.maxPrice) {
+      result = result.filter(item => (item.price || item.monto_disponible_CLP || 0) <= Number(filters.maxPrice));
+    }
+    if (filters.region) {
+      const rName = REGION_MAP[filters.region];
+      if (rName) result = result.filter(item => item.region && item.region.toLowerCase().includes(rName.toLowerCase()));
+    }
+    
+    setTotalCount(result.length);
+    
+    const itemsPerPage = 15;
+    const startIndex = (page - 1) * itemsPerPage;
+    const paginated = result.slice(startIndex, startIndex + itemsPerPage);
+    
+    setFilteredData(paginated);
   }, [data, excelData, filters, page]);
 
   const handleNextPage = () => {
       const nextPage = page + 1;
       setPage(nextPage);
-      if (!excelData) fetchData(nextPage, filters);
   };
 
   const handlePrevPage = () => {
       if (page > 1) {
           const prevPage = page - 1;
           setPage(prevPage);
-          if (!excelData) fetchData(prevPage, filters);
       }
   };
 
@@ -212,6 +202,21 @@ export default function Dashboard() {
         {error && <span style={{ color: 'var(--danger-color)', fontSize: '0.9rem' }}>{error}</span>}
       </div>
       
+      {isBackgroundLoading && (
+        <div className="glass-panel animate-fade-in" style={{ padding: '15px 20px', display: 'flex', alignItems: 'center', gap: '15px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid var(--accent-color)' }}>
+          <div style={{ width: '20px', height: '20px', border: '2px solid rgba(255,255,255,0.2)', borderTopColor: 'var(--accent-color)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+          <div style={{ flex: 1 }}>
+             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+                 <span style={{ fontSize: '0.9rem', color: 'var(--accent-color)', fontWeight: 'bold' }}>Sincronización Profunda en Progreso...</span>
+                 <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Página {backgroundProgress.current} de {backgroundProgress.total}</span>
+             </div>
+             <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
+                 <div style={{ width: `${(backgroundProgress.current / backgroundProgress.total) * 100}%`, height: '100%', background: 'var(--accent-color)', transition: 'width 0.3s' }}></div>
+             </div>
+          </div>
+        </div>
+      )}
+
       {isRefreshingExcel && (
         <div className="glass-panel" style={{ padding: '20px', textAlign: 'center', background: 'rgba(0, 198, 255, 0.1)', border: '1px solid var(--accent-color)' }}>
           <h3 style={{ color: 'var(--accent-color)', marginBottom: '10px' }}>Bypass en progreso: Descargando datos ocultos...</h3>
@@ -250,10 +255,10 @@ export default function Dashboard() {
                  </span>
                  <button 
                     onClick={handleNextPage} 
-                    disabled={isLoading || ((filters.callNumber === '2' && excelData) ? (page * 15 >= totalCount) : data.length === 0)}
+                    disabled={page * 15 >= totalCount}
                     style={{
                         padding: '8px 16px', background: 'var(--primary-color)', border: 'none',
-                        color: 'white', borderRadius: '8px', cursor: (isLoading || ((filters.callNumber === '2' && excelData) ? (page * 15 >= totalCount) : data.length === 0)) ? 'not-allowed' : 'pointer', opacity: (isLoading || ((filters.callNumber === '2' && excelData) ? (page * 15 >= totalCount) : data.length === 0)) ? 0.5 : 1
+                        color: 'white', borderRadius: '8px', cursor: (page * 15 >= totalCount) ? 'not-allowed' : 'pointer', opacity: (page * 15 >= totalCount) ? 0.5 : 1
                     }}>
                      Siguiente
                  </button>
