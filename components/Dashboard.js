@@ -40,7 +40,7 @@ export default function Dashboard() {
     setIsBackgroundLoading(true);
     let currentData = [...accumulatedData];
     
-    const BATCH_SIZE = 3; // 3 parallel requests to speed up safely on Vercel
+    const BATCH_SIZE = 5; // 5 parallel requests to speed up safely on Vercel
     for (let p = startPage; p <= totalPages; p += BATCH_SIZE) {
       try {
         const promises = [];
@@ -137,8 +137,8 @@ export default function Dashboard() {
     if (data.length === 0 && !syncRef.current) {
       syncRef.current = true;
       fetchData();
+      syncExcelData(); // Auto-start the Excel Bypass immediately on load
     }
-    // Ya NO sincronizamos el Excel al cargar, solo cuando el usuario lo pida
   }, []);
 
   // Whenever filters change, reset page
