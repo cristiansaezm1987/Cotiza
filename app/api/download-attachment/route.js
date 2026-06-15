@@ -4,6 +4,14 @@ import chromium from '@sparticuz/chromium-min';
 import { addExtra } from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 
+// Vercel NFT explicit tracing
+if (false) {
+  require('puppeteer-extra-plugin-user-preferences');
+  require('puppeteer-extra-plugin-user-data-dir');
+  require('puppeteer-extra-plugin');
+  require('fs-extra');
+}
+
 export const maxDuration = 60;
 
 export async function GET(request) {
