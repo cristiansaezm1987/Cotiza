@@ -2,13 +2,18 @@
 const nextConfig = {
     serverExternalPackages: [
         'puppeteer-core', '@sparticuz/chromium-min', 'puppeteer', 'puppeteer-extra', 'puppeteer-extra-plugin-stealth', 
-        'merge-deep', 'clone-deep', 'is-plain-object', 'isobject', 'for-own', 'kind-of', 'shallow-clone', 'for-in', 'mixin-object', 'lazy-cache', 'is-extendable'
+        'merge-deep', 'clone-deep', 'is-plain-object', 'isobject', 'for-own', 'kind-of', 'shallow-clone', 'for-in', 'mixin-object', 'lazy-cache', 'is-extendable',
+        'puppeteer-extra-plugin-user-preferences', 'puppeteer-extra-plugin-user-data-dir', 'puppeteer-extra-plugin', 'deepmerge'
     ],
     experimental: {
         outputFileTracingIncludes: {
             '/api/**/*': [
                 './node_modules/puppeteer-extra/**/*',
                 './node_modules/puppeteer-extra-plugin-stealth/**/*',
+                './node_modules/puppeteer-extra-plugin-user-preferences/**/*',
+                './node_modules/puppeteer-extra-plugin-user-data-dir/**/*',
+                './node_modules/puppeteer-extra-plugin/**/*',
+                './node_modules/deepmerge/**/*',
                 './node_modules/merge-deep/**/*',
                 './node_modules/clone-deep/**/*',
                 './node_modules/is-plain-object/**/*',
