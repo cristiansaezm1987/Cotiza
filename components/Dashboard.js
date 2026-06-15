@@ -47,7 +47,7 @@ export default function Dashboard() {
     setIsBackgroundLoading(true);
     let currentData = [...accumulatedData];
     
-    const BATCH_SIZE = 5; // 5 parallel requests to speed up safely on Vercel
+    const BATCH_SIZE = 2; // Reducido a 2 para evitar ahogar el servidor (Timeouts)
     let p = startPage;
     
     while (p <= totalPages) {
@@ -60,7 +60,21 @@ export default function Dashboard() {
       try {
         const promises = [];
         for (let i = 0; i < BATCH_SIZE && (p + i) <= totalPages; i++) {
-          promises.push(fetch(`/api/scrape?page=${p + i}`).then(r => r.json()).catch(() => null));
+          const fetchWithRetry = async (pageNum) => {
+            for (let attempt = 1; attempt <= 3; attempt++) {
+              try {
+                const r = await fetch(`/api/scrape?page=${pageNum}`);
+                const json = await r.json();
+                if (json && json.success) return json;
+                throw new Error('No data or success flag missing');
+              } catch (e) {
+                if (attempt === 3) return null;
+                await new Promise(res => setTimeout(res, 2000 * attempt)); // Esperar antes de reintentar
+              }
+            }
+            return null;
+          };
+          promises.push(fetchWithRetry(p + i));
         }
         
         const results = await Promise.all(promises);
@@ -170,13 +184,13 @@ export default function Dashboard() {
 
   // Local filtering for both API mode and Excel mode
   useEffect(() => {
-    let result = [];
-    
-    if (filters.callNumber === '2' && excelData) {
-      result = excelData;
-    } else {
-      result = data; // API mode uses the background-loaded data
+    // Definir la base de datos a filtrar
+    let baseData = data;
+    if (filters.callNumber === '2' && excelData && excelData.length > 0) {
+      baseData = excelData;
     }
+
+    let result = [...baseData];
     
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
@@ -191,15 +205,19 @@ export default function Dashboard() {
         result = result.filter(item => item.statusName && item.statusName.toLowerCase().includes(statusMap[filters.status].toLowerCase()));
       }
     }
-    if (filters.callNumber) {
-      result = result.filter(item => item.callNumber === Number(filters.callNumber));
-    }
     if (filters.maxPrice) {
       result = result.filter(item => (item.price || item.monto_disponible_CLP || 0) <= Number(filters.maxPrice));
     }
     if (filters.region) {
       const rName = REGION_MAP[filters.region];
       if (rName) result = result.filter(item => item.region && item.region.toLowerCase().includes(rName.toLowerCase()));
+    }
+    
+    // Solo filtramos si NO estamos en Segundo Llamado desde Excel (porque el Excel ya es Segundo Llamado)
+    if (filters.callNumber) {
+      if (!(filters.callNumber === '2' && excelData && excelData.length > 0)) {
+        result = result.filter(item => item.callNumber === Number(filters.callNumber));
+      }
     }
     
     setTotalCount(result.length);
