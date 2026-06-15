@@ -213,11 +213,8 @@ export default function Dashboard() {
       if (rName) result = result.filter(item => item.region && item.region.toLowerCase().includes(rName.toLowerCase()));
     }
     
-    // Solo filtramos si NO estamos en Segundo Llamado desde Excel (porque el Excel ya es Segundo Llamado)
     if (filters.callNumber) {
-      if (!(filters.callNumber === '2' && excelData && excelData.length > 0)) {
-        result = result.filter(item => item.callNumber === Number(filters.callNumber));
-      }
+      result = result.filter(item => item.callNumber === Number(filters.callNumber));
     }
     
     setTotalCount(result.length);
