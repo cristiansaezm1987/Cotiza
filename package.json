@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@sparticuz/chromium-min": "^149.0.0",
-    "clone-deep": "^4.0.1",
+    "clone-deep": "^0.2.4",
     "for-in": "^1.0.2",
     "for-own": "^1.0.0",
     "got-scraping": "^4.2.1",
