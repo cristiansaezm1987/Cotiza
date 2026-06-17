@@ -91,50 +91,37 @@ export default function SmartQuoter({ item, details, aiKeywords, onMarkSubmitted
       }
   };
 
-  const handlePasteLink = (index) => {
+  const handlePasteLink = async (index) => {
       const link = prompt('Pega aquí el link completo de Mercado Libre:');
       if (!link || !link.includes('mercadolibre.cl')) {
           if (link) alert('Por favor, ingresa un enlace válido de Mercado Libre Chile.');
           return;
       }
       
-      let priceStr = prompt('Ingresa el precio del producto (solo números, ej: 15990):');
-      if (!priceStr) return;
+      // Muestra al usuario que está cargando
+      setIsManualSearching(prev => ({ ...prev, [index]: true }));
       
-      const price = parseInt(priceStr.replace(/[^0-9]/g, ''), 10);
-      if (isNaN(price) || price <= 0) {
-          alert('Precio inválido.');
-          return;
-      }
-
-      // Try to extract a title from the URL
-      let title = 'Producto Personalizado';
       try {
-          const parts = new URL(link).pathname.split('-');
-          if (parts.length > 2) {
-              title = parts.slice(2, -1).join(' ').replace(/_/g, ' ');
-              title = title.charAt(0).toUpperCase() + title.slice(1);
+          const res = await fetch(`/api/mercadolibre-gemini?url=${encodeURIComponent(link)}`);
+          let data = {};
+          try { data = await res.json(); } catch (e) {}
+
+          if (res.ok && data.success && data.result) {
+              const customProd = data.result;
+              setMlResultsMap(prev => {
+                  const current = prev[index] || [];
+                  return { ...prev, [index]: [customProd, ...current] };
+              });
+              selectProduct(index, customProd);
+          } else {
+              alert('Error procesando enlace: ' + (data.error || 'Respuesta inválida'));
           }
-      } catch (e) {}
-
-      const customProd = {
-          id: `MLC-CUSTOM-${Math.floor(Math.random() * 1000000)}`,
-          title: title,
-          description: 'Producto agregado manualmente por enlace.',
-          price: price,
-          currency: 'CLP',
-          thumbnail: 'https://http2.mlstatic.com/frontend-assets/ui-navigation/5.19.1/mercadolibre/logo__small.png',
-          permalink: link,
-          condition: 'new',
-          shipping: 'Calculado',
-          source: 'Mercado Libre (Manual)'
-      };
-
-      setMlResultsMap(prev => {
-          const current = prev[index] || [];
-          return { ...prev, [index]: [customProd, ...current] };
-      });
-      selectProduct(index, customProd);
+      } catch (e) {
+          console.error(e);
+          alert('Error de conexión al procesar el enlace');
+      } finally {
+          setIsManualSearching(prev => ({ ...prev, [index]: false }));
+      }
   };
 
   const generateQuote = async () => {
@@ -154,27 +141,32 @@ export default function SmartQuoter({ item, details, aiKeywords, onMarkSubmitted
               const itemName = items[i].nombre;
               
               // 1. Get historical intelligence
-              const histRes = await fetch(`/api/market-intelligence?q=${encodeURIComponent(itemName)}&days=3`);
-              const histData = await histRes.json();
-              
               let historyAvg = 0;
               let historyMax = 0;
               let historyVol = 0;
-
-              if (histData.success && histData.data && histData.data.length > 0) {
-                  let sumPrices = 0;
-                  let validPrices = 0;
-                  histData.data.forEach(order => {
-                      order.items?.forEach(orderItem => {
-                          if (orderItem.precioNeto > 0) {
-                              sumPrices += orderItem.precioNeto;
-                              validPrices++;
-                              if (orderItem.precioNeto > historyMax) historyMax = orderItem.precioNeto;
-                          }
-                          historyVol += orderItem.cantidad || 0;
-                      });
-                  });
-                  historyAvg = validPrices > 0 ? Math.round(sumPrices / validPrices) : 0;
+              
+              try {
+                  const histRes = await fetch(`/api/market-intelligence?q=${encodeURIComponent(itemName)}&days=3`);
+                  if (histRes.ok) {
+                      const histData = await histRes.json();
+                      if (histData.success && histData.data && histData.data.length > 0) {
+                          let sumPrices = 0;
+                          let validPrices = 0;
+                          histData.data.forEach(order => {
+                              order.items?.forEach(orderItem => {
+                                  if (orderItem.precioNeto > 0) {
+                                      sumPrices += orderItem.precioNeto;
+                                      validPrices++;
+                                      if (orderItem.precioNeto > historyMax) historyMax = orderItem.precioNeto;
+                                  }
+                                  historyVol += orderItem.cantidad || 0;
+                              });
+                          });
+                          historyAvg = validPrices > 0 ? Math.round(sumPrices / validPrices) : 0;
+                      }
+                  }
+              } catch (histErr) {
+                  console.error("Market intelligence error:", histErr);
               }
 
               // 2. Cross-reference with Gemini
@@ -187,10 +179,19 @@ export default function SmartQuoter({ item, details, aiKeywords, onMarkSubmitted
                       historyData: { average: historyAvg, max: historyMax, items: [] }
                   })
               });
+              let aiData = { success: false };
+              try {
+                  const aiText = await aiRes.text();
+                  try {
+                      aiData = JSON.parse(aiText);
+                  } catch (e) {
+                      console.error("No se pudo parsear JSON de generate-quote", aiText);
+                  }
+              } catch (e) {
+                  console.error("Error leyendo respuesta de generate-quote", e);
+              }
               
-              const aiData = await aiRes.json();
-              
-              if (aiData.success) {
+              if (aiData.success && aiData.data) {
                   newQuotesMap[i] = {
                       ...aiData.data,
                       historyAvg,
