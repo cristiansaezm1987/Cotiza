@@ -19,32 +19,39 @@ export async function GET(request) {
     
     console.log(`Starting Scrape. Page: ${pageParam}, Region: ${regionParam}, Status: ${statusParam}`);
     
-    if (isVercel) {
-      const puppeteerExtraVercel = addExtra(puppeteerCore);
-      puppeteerExtraVercel.use(StealthPlugin());
-      
-      browser = await puppeteerExtraVercel.launch({
-        args: [...chromium.args, '--hide-scrollbars', '--disable-web-security'],
-        defaultViewport: chromium.defaultViewport,
-        executablePath: await chromium.executablePath(
-          'https://github.com/Sparticuz/chromium/releases/download/v149.0.0/chromium-v149.0.0-pack.x64.tar'
-        ),
-        headless: chromium.headless,
-        ignoreHTTPSErrors: true,
-      });
-    } else {
-      const puppeteerExtra = require('puppeteer-extra');
-      const puppeteer = puppeteerExtra.default || puppeteerExtra;
-      const StealthPluginLocal = require('puppeteer-extra-plugin-stealth');
-      puppeteer.use(StealthPluginLocal());
-      
-      browser = await puppeteer.launch({
-        headless: 'new',
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security']
-      });
+    let page;
+    try {
+        if (!global.puppeteerBrowser) throw new Error("No browser");
+        page = await global.puppeteerBrowser.newPage();
+    } catch (e) {
+        console.log("Browser disconnected, relaunching...");
+        if (isVercel) {
+          const puppeteerExtraVercel = addExtra(puppeteerCore);
+          puppeteerExtraVercel.use(StealthPlugin());
+          
+          global.puppeteerBrowser = await puppeteerExtraVercel.launch({
+            args: [...chromium.args, '--hide-scrollbars', '--disable-web-security'],
+            defaultViewport: chromium.defaultViewport,
+            executablePath: await chromium.executablePath(
+              'https://github.com/Sparticuz/chromium/releases/download/v149.0.0/chromium-v149.0.0-pack.x64.tar'
+            ),
+            headless: chromium.headless,
+            ignoreHTTPSErrors: true,
+          });
+        } else {
+          const puppeteerExtra = require('puppeteer-extra');
+          const puppeteer = puppeteerExtra.default || puppeteerExtra;
+          const StealthPluginLocal = require('puppeteer-extra-plugin-stealth');
+          puppeteer.use(StealthPluginLocal());
+          
+          global.puppeteerBrowser = await puppeteer.launch({
+            headless: 'new',
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security']
+          });
+        }
+        page = await global.puppeteerBrowser.newPage();
     }
-
-    const page = await browser.newPage();
+    browser = global.puppeteerBrowser;
     let interceptedData = null;
     let totalCount = 0;
 
@@ -94,7 +101,7 @@ export async function GET(request) {
         new Promise(r => setTimeout(r, 25000))
     ]);
 
-    await browser.close();
+    await page.close();
 
     if (interceptedData) {
       let finalData = interceptedData;
@@ -122,7 +129,6 @@ export async function GET(request) {
     }
 
   } catch (error) {
-    if (browser) await browser.close();
     console.error('Scraping error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }

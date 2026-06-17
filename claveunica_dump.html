@@ -1,0 +1,175 @@
+
+
+    <!-- Google Tag Manager (noscript) -->
+    <noscript>
+        <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-MDBT2F3" height="0" width="0"
+            style="display:none;visibility:hidden">
+        </iframe>
+    </noscript>
+    <!-- End Google Tag Manager (noscript) -->
+
+    
+    <main class="mainloginCU">
+        <section>
+            <div class="container main-body">
+                <div class="row">
+                    <div class="col-md-8 col-lg-6 offset-md-2 offset-lg-3 border-fr-grey">
+                        <div class="header-form">
+                            <div class="franja">
+                                <span class="franjaazul"></span>
+                                <span class="franjaroja"></span>
+                            </div>
+                            <div class="row">
+                                <img id="cu-logo" src="/static/img/clave_unica_color.7d8e1b56a097.svg" alt="ClaveÚnica" class="img-logo-cu">
+
+                                <img id="cu-logo-blanco" src="/static/img/clave_unica_blanco.6ab9f0e298d9.svg" alt="ClaveÚnica" hidden="">
+                                <img id="cu-logo-normal" src="/static/img/clave_unica_color.7d8e1b56a097.svg" alt="ClaveÚnica" hidden="">
+
+                                <img role="button" src="/static/img/contraste.73baf9cf4e43.svg" alt="Cambiar contraste" class="img-contraste" id="toggle-contrast" tabindex="1">
+                                <img role="button" src="/static/img/amin.d16570595fd3.svg" alt="Disminuir texto" class="img-amin" id="decrease-font-button" tabindex="2">
+                                <img role="button" src="/static/img/aplus.35e4172a57b1.svg" alt="Aumentar texto" class="img-aplus" id="increase-font-button" tabindex="3">
+
+
+                                <img role="button" src="/static/img/aminblocked.24fa2557c7b8.svg" alt="Disminuir texto" class="img-amin" id="aminblocked" hidden="">
+                                <img role="button" src="/static/img/amaxblocked.52d29fd3f857.svg" alt="Aumentar texto" class="img-aplus" id="amaxblocked" hidden="">
+                            </div>
+                            
+                            <div class="header-form-title">
+                                <h2>Mercado Público</h2>
+                            </div>
+                        </div>
+                        
+
+                        
+
+                        <form class="goblogin" onsubmit="onSubmit()" method="POST" action="/accounts/login?next=/openid/authorize/%3Fscope%3Dopenid%2Brun%2Bname%26state%3DBmWX_-O019L1mMHqi32IWlYQFv7DDzkt9WDJU3XkfWQ.vm89Dks8hdA.ZONg1LgDQpWg8alwdsYM-A.eyJydSI6Imh0dHBzOi8vd3d3Lm1lcmNhZG9wdWJsaWNvLmNsL0hvbWUiLCJydCI6ImNvZGUgaWRfdG9rZW4gdG9rZW4iLCJybSI6ImZyYWdtZW50Iiwic3QiOiJhODI3Y2ExZC0zOTQ5LTRmZjEtOWYxZS0wMDk3NjA1YTU1ZWYifQ%26response_type%3Dcode%26client_id%3D67339e06f4b44f78994ff4785178807a%26redirect_uri%3Dhttps%253A%252F%252Fheimdall.mercadopublico.cl%252Fauth%252Frealms%252Fmercadopublico%252Fbroker%252Foidc%252Fendpoint%26prompt%3Dlogin%26nonce%3D4EpyzohQOZEWQYjugknJWA" id="login-form" autocomplete="off" role="form" aria-label="">
+                            <input type="hidden" name="csrfmiddlewaretoken" value="elRIUBy34GLBSYCSGfoqHPjmJEh6igIaOWG67xbevFxF3wommmQzHlDeHl2cYnRN">
+                            <input type="hidden" name="next" value="/openid/authorize/?scope=openid+run+name&amp;state=BmWX_-O019L1mMHqi32IWlYQFv7DDzkt9WDJU3XkfWQ.vm89Dks8hdA.ZONg1LgDQpWg8alwdsYM-A.eyJydSI6Imh0dHBzOi8vd3d3Lm1lcmNhZG9wdWJsaWNvLmNsL0hvbWUiLCJydCI6ImNvZGUgaWRfdG9rZW4gdG9rZW4iLCJybSI6ImZyYWdtZW50Iiwic3QiOiJhODI3Y2ExZC0zOTQ5LTRmZjEtOWYxZS0wMDk3NjA1YTU1ZWYifQ&amp;response_type=code&amp;client_id=67339e06f4b44f78994ff4785178807a&amp;redirect_uri=https%3A%2F%2Fheimdall.mercadopublico.cl%2Fauth%2Frealms%2Fmercadopublico%2Fbroker%2Foidc%2Fendpoint&amp;prompt=login&amp;nonce=4EpyzohQOZEWQYjugknJWA">
+                            <input type="hidden" name="app_name" value="Mercado Público">
+                            <input id="grctoken" name="token" type="hidden" value="">
+
+                            <div class="form-group group-label ">
+                                <!-- class control-success cuando el value sea correcto y clase control-error cuando el campo se erroneo-->
+                                <input aria-label="Ingresa tu RUN" id="uname" name="run" type="text" class="form-control rut" value="" autocomplete="off" required="" tabindex="4" minlength="" maxlength="">
+                                <label style="color: #6c757d;">Ingresa tu RUN</label>
+                                <i class="material-icons gob-cancel">cancel</i>
+                                <i class="material-icons gob-check">check</i>
+                                <span class="gob--lbl-error">Ingresa correctamente tu RUN de 7 u 8 números más digito
+                                    verificador</span>
+                            </div>
+
+                            <div class="form-group group-label ">
+                                <div class="input-group">
+                                    <input aria-label="Ingresa tu ClaveÚnica" id="pword" type="password" class="form-control" name="password" value="" autocomplete="new-password" placeholder="Ingresa tu ClaveÚnica" required="" minlength="" tabindex="5" maxlength="">
+                                    <div class="input-group-append">
+                                        <button type="button" role="button" tabindex="6" class="btn-toggle-password disabled_butt" onclick="togglePasswordVisibility(event)" aria-label="Mostrar contraseña" disabled="">
+                                            <i class="material-icons">visibility</i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <label for="pword">Ingresa tu ClaveÚnica</label>
+                                <i class="material-icons gob-cancel">cancel</i>
+                                <i class="material-icons gob-check">check</i>
+                                <span class="gob--lbl-error">Tu ClaveÚnica debe tener al menos {{
+                                    form.password_min_length }} caracteres</span>
+                            </div>
+
+                            <p><a class="recovery" href="https://claveunica.gob.cl/recuperar" tabindex="7">Recupera tu ClaveÚnica</a>
+                            </p>
+                            <p><a class="recovery" href="https://claveunica.gob.cl/sucursales" tabindex="8"> Solicita tu ClaveÚnica</a>
+                            </p>
+
+                            <div class="form-buttom" style="margin-top: 30px">
+                                
+                                <div class="col-xs-12" style="text-align: right">
+                                    <button class="w-100 gob-btn-primary disabled_butt" data-callback="onSubmit" tabindex="9" id="login-submit" disabled="">
+                                        INGRESA
+                                    </button>
+                                </div>
+                                
+                            </div>
+                            <div class="row justify-content-md-center">
+                                <div class="col-md-8 col-lg-6 foofr">
+                                    <!-- <a href="https://siac.srcei.cl/contacto/">Ir a Sistema de Atención Ciudadana</a> -->
+                                    <a href="https://claveunica.gob.cl/preguntas-frecuentes" tabindex="10">¿Necesitas
+                                        ayuda?</a>
+                                </div>
+                            </div>
+                        </form>
+                        <!--<img src="https://claveunica.gob.cl/assets/footer_cu.png" alt="Gobierno Digital y Registro Civil" style="width: 100%" class="d-block d-md-none">-->
+                    </div>
+                </div>
+            </div>
+
+            
+
+            
+        </section>
+    </main>
+
+    <footer class="bg-dark-blue text-white">
+        <div class="container">
+            <div class="srCivil">
+                <span>Colabora:</span>
+                <img src="/static/img/srcei.2553d55a4706.svg" alt="Logotipo de Servicio de Registro Civil e Identificación, Ministerio de Justicia y Derechos Humanos">
+            </div>
+            <div class="disclaimer">
+                <span>
+                    <p>Servicio de autenticación ClaveÚnica® </p>
+                    <p>Gobierno de Chile</p>
+                </span>
+            </div>
+            <div class="gobDigital">
+                <span>Administra:</span>
+                <img src="/static/img/sgd.6fb1aee781f2.svg" alt="Logotipo de Secretaría de Gobierno Digital Chile, Ministerio de Hacienda">
+            </div>
+        </div>
+    </footer>
+
+    <script src="/static/js/jquery.min.767a77430d12.js"></script>
+    <script>
+        //TODO: probably best to place this script into oidc.js
+        function checkInputAndDisableSubmitButton() {
+            if (($("#pword").val() === "") || ($("#uname").val() === "")) {
+                $('button').prop("disabled", true);
+                $('button').addClass("disabled_butt")
+            } else {
+                $('button').prop("disabled", false);
+                $('button').removeClass("disabled_butt")
+            }
+        }
+        $(function () { //on load
+            //checks form inputs and disable button on load
+            checkInputAndDisableSubmitButton()
+            // sets keyup event on inputs
+            $("#uname, #pword").keyup(function () {
+                checkInputAndDisableSubmitButton()
+            })
+        })
+    </script>
+    <script src="/static/js/bootstrap.min.30ba3a49f95e.js"></script>
+    <script src="/static/js/rut-helper.507bd31216a7.js"></script>
+    <script src="/static/js/accessibility.56d5cd629526.js"></script>
+    <script src="/static/js/oidc.2ba5dd360f21.js"></script>
+    <script>
+        function togglePasswordVisibility(event) {
+            event.preventDefault();
+            const passwordInput = document.getElementById('pword');
+            const icon = document.querySelector('.btn-toggle-password i');
+
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                icon.textContent = 'visibility_off';
+            } else {
+                passwordInput.type = 'password';
+                icon.textContent = 'visibility';
+            }
+
+            // Don't focus the input if it's empty
+            if (passwordInput.value) {
+                passwordInput.focus();
+            }
+        }
+    </script>
+
+

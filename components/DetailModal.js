@@ -1,24 +1,117 @@
 import { useState, useEffect } from 'react';
-import { X, Package, MapPin, Building2, Calendar, FileText, Paperclip, Download } from 'lucide-react';
+import { X, Package, MapPin, Building2, Calendar, FileText, Paperclip, Download, Calculator } from 'lucide-react';
+import SmartQuoter from './SmartQuoter';
 
-export default function DetailModal({ item, onClose }) {
+export default function DetailModal({ item, onClose, onMarkSubmitted }) {
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [downloadingId, setDownloadingId] = useState(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [aiAnalysis, setAiAnalysis] = useState(null);
+  const [failedPdfs, setFailedPdfs] = useState([]);
+  const [isUploading, setIsUploading] = useState(false);
 
   const handleDownload = (file) => {
       setDownloadingId(file.id);
-      const url = `/api/download-attachment?id=${file.id}&code=${details.codigo}&name=${encodeURIComponent(file.nombreArchivo)}`;
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = file.nombreArchivo;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      const url = `/api/download-attachment?id=${file.id}&code=${details.codigo}&name=${encodeURIComponent(file.nombreArchivo || 'adjunto.pdf')}`;
+      window.open(url, '_blank');
+      setTimeout(() => setDownloadingId(null), 1000);
+  };
       
-      // Clear visual feedback after 5 seconds since browser handles the download
-      setTimeout(() => setDownloadingId(null), 5000);
+  const handleAnalyzeText = async (additionalText = "") => {
+      setIsAnalyzing(true);
+      setFailedPdfs([]);
+      try {
+          let fullText = details.descripcion || '';
+          if (details.productos_solicitados) {
+              fullText += " Productos: " + details.productos_solicitados.map(p => `${p.nombre} ${p.descripcion}`).join(", ");
+          }
+
+          let pdfs = [];
+          let currentFailed = [];
+          
+          // If there are attachments, fetch and extract text from PDFs
+          if (details.adjuntos && details.adjuntos.length > 0) {
+              for (const file of details.adjuntos) {
+                  if (file.nombreArchivo?.toLowerCase().endsWith('.pdf')) {
+                      try {
+                          const url = `/api/download-attachment?id=${file.id}&code=${details.codigo}&extractText=true`;
+                          const res = await fetch(url);
+                          const json = await res.json();
+                          if (json.success && json.base64) {
+                              pdfs.push({ name: file.nombreArchivo, base64: json.base64 });
+                          } else {
+                              currentFailed.push(file);
+                          }
+                      } catch (err) {
+                          console.error("Error fetching PDF text:", err);
+                          currentFailed.push(file);
+                      }
+                  }
+              }
+          }
+
+          if (currentFailed.length > 0) {
+              setFailedPdfs(currentFailed);
+          }
+
+          const res = await fetch('/api/intelligence/read-text', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ text: fullText, pdfs: pdfs })
+          });
+          const json = await res.json();
+          if (json.success) {
+              setAiAnalysis(json.data);
+          }
+      } catch (e) {
+          console.error(e);
+      } finally {
+          setIsAnalyzing(false);
+      }
+  };
+
+  const handleManualUpload = async (e) => {
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+      
+      setIsUploading(true);
+      let pdfs = [];
+      
+      try {
+          for (const file of files) {
+              const arrayBuffer = await file.arrayBuffer();
+              const base64 = Buffer.from(arrayBuffer).toString('base64');
+              pdfs.push({ name: file.name, base64: base64 });
+          }
+          
+          if (pdfs.length > 0) {
+              setFailedPdfs([]);
+              // We pass the new PDFs straight into analysis!
+              setIsAnalyzing(true);
+              let fullText = details.descripcion || '';
+              if (details.productos_solicitados) {
+                  fullText += " Productos: " + details.productos_solicitados.map(p => `${p.nombre} ${p.descripcion}`).join(", ");
+              }
+              const res = await fetch('/api/intelligence/read-text', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ text: fullText, pdfs: pdfs })
+              });
+              const json = await res.json();
+              if (json.success) {
+                  setAiAnalysis(json.data);
+              }
+          }
+      } catch (err) {
+          console.error("Upload error:", err);
+          alert("Ocurrió un error al subir el archivo.");
+      } finally {
+          setIsAnalyzing(false);
+          setIsUploading(false);
+          e.target.value = null;
+      }
   };
 
   useEffect(() => {
@@ -78,12 +171,79 @@ export default function DetailModal({ item, onClose }) {
             </div>
 
             <div style={{ background: 'rgba(255,255,255,0.03)', padding: '20px', borderRadius: '12px' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 500, marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <FileText size={18} /> Descripción
-              </h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <FileText size={18} /> Descripción
+                  </h3>
+                  <button 
+                     onClick={handleAnalyzeText} 
+                     disabled={isAnalyzing}
+                     style={{
+                         background: 'linear-gradient(90deg, #10b981, #059669)', border: 'none', color: 'white',
+                         padding: '6px 12px', borderRadius: '6px', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer',
+                         display: 'flex', alignItems: 'center', gap: '5px'
+                     }}>
+                      {isAnalyzing ? 'Procesando documentos e IA...' : '✨ Analizar con IA'}
+                  </button>
+              </div>
               <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
                 {details.descripcion || 'Sin descripción adicional.'}
               </p>
+              
+              {aiAnalysis && (
+                  <div className="animate-fade-in" style={{ marginTop: '15px', padding: '15px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid #10b981', borderRadius: '8px' }}>
+                      <h4 style={{ color: '#10b981', fontSize: '1rem', marginBottom: '10px', display: 'flex', gap: '5px' }}>
+                          ✨ Análisis de Inteligencia Artificial
+                      </h4>
+                      <p style={{ color: 'white', fontSize: '0.9rem', marginBottom: '10px' }}>{aiAnalysis.summary}</p>
+                      <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                          <span style={{ fontSize: '0.8rem', background: aiAnalysis.complexity === 'alta' ? 'rgba(239,68,68,0.2)' : aiAnalysis.complexity === 'baja' ? 'rgba(16,185,129,0.2)' : 'rgba(245,158,11,0.2)', color: aiAnalysis.complexity === 'alta' ? '#ef4444' : aiAnalysis.complexity === 'baja' ? '#10b981' : '#fbbf24', padding: '4px 8px', borderRadius: '4px' }}>
+                              Complejidad: {aiAnalysis.complexity.toUpperCase()}
+                          </span>
+                          <span style={{ fontSize: '0.8rem', background: aiAnalysis.is_profitable ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)', color: aiAnalysis.is_profitable ? '#10b981' : '#ef4444', padding: '4px 8px', borderRadius: '4px' }}>
+                              {aiAnalysis.is_profitable ? 'Alta Rentabilidad' : 'Baja Rentabilidad'}
+                          </span>
+                      </div>
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                          <strong>Términos de Búsqueda Sugeridos: </strong> 
+                          {aiAnalysis.keywords.map((k, i) => (
+                              <span key={i} style={{ background: 'rgba(255,255,255,0.1)', color: 'white', padding: '2px 6px', borderRadius: '4px', marginRight: '5px' }}>{k}</span>
+                          ))}
+                      </div>
+                  </div>
+              )}
+
+              {failedPdfs.length > 0 && (
+                  <div className="animate-fade-in" style={{ marginTop: '15px', padding: '15px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #ef4444', borderRadius: '8px' }}>
+                      <h4 style={{ color: '#ef4444', fontSize: '0.95rem', marginBottom: '8px', display: 'flex', gap: '5px', alignItems: 'center' }}>
+                          ⚠️ Ciberseguridad de Mercado Público detectada
+                      </h4>
+                      <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '12px' }}>
+                          El sistema tiene el nombre del archivo, pero Mercado Público ha bloqueado la descarga automática invisible mediante Cloudflare. 
+                          Para que la IA lo lea, necesitas descargar el archivo tú mismo y subirlo aquí:
+                      </p>
+                      
+                      <div style={{ position: 'relative', display: 'inline-block' }}>
+                          <input 
+                              type="file" 
+                              accept=".pdf" 
+                              multiple 
+                              onChange={handleManualUpload} 
+                              disabled={isUploading}
+                              style={{
+                                  position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer'
+                              }} 
+                          />
+                          <button style={{ 
+                              background: '#3b82f6', color: 'white', border: 'none', padding: '6px 14px', 
+                              borderRadius: '6px', fontSize: '0.85rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' 
+                          }}>
+                              <Paperclip size={16} /> 
+                              {isUploading ? 'Procesando PDF e IA...' : 'Adjuntar PDF manualmente'}
+                          </button>
+                      </div>
+                  </div>
+              )}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
@@ -103,6 +263,15 @@ export default function DetailModal({ item, onClose }) {
                   {details.plazo_entrega ? `${details.plazo_entrega} días` : 'No especificado'}
                 </p>
               </div>
+            </div>
+
+            <div style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid #f59e0b', padding: '20px', borderRadius: '12px', marginTop: '10px' }}>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: '#f59e0b', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Calculator size={18} /> Presupuesto Estimado
+                </h3>
+                <p style={{ fontSize: '1.5rem', fontWeight: 700, color: 'white', margin: 0 }}>
+                  {details.presupuesto_estimado ? `$${details.presupuesto_estimado.toLocaleString('es-CL')}` : 'No disponible'}
+                </p>
             </div>
 
             <div>
@@ -186,6 +355,14 @@ export default function DetailModal({ item, onClose }) {
                 </div>
               </div>
             )}
+
+            {/* Smart Quoter Component */}
+            <SmartQuoter 
+                item={item} 
+                details={details} 
+                aiKeywords={aiAnalysis?.keywords} 
+                onMarkSubmitted={onMarkSubmitted}
+            />
 
             <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
               <a 

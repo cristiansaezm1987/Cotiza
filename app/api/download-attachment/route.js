@@ -51,25 +51,26 @@ export async function GET(request) {
     await page.setRequestInterception(true);
     
     page.on('request', interceptedRequest => {
-        if (interceptedRequest.url().includes('listar')) {
+        if (interceptedRequest.url().includes('listar') || interceptedRequest.url().includes('adjunto')) {
             const headers = interceptedRequest.headers();
-            // Store authorization headers
             Object.assign(authHeaders, headers);
         }
         interceptedRequest.continue();
     });
 
-    // Navigate to the Ficha page to establish session and steal auth headers
-    await page.goto(`https://buscador.mercadopublico.cl/ficha?code=${tenderCode}`, { waitUntil: 'networkidle2' });
-
-    // Ensure we got some headers
-    if (!authHeaders || Object.keys(authHeaders).length === 0) {
-        throw new Error("No pudimos obtener los tokens de seguridad de Mercado Público.");
+    // Navigate to the Ficha page to establish session and steal headers
+    try {
+        await page.goto(`https://buscador.mercadopublico.cl/ficha?code=${tenderCode}`, { waitUntil: 'networkidle2', timeout: 30000 });
+    } catch (e) {
+        console.warn("Navigation timeout, proceeding...");
     }
+
+    const extractText = searchParams.get('extractText') === 'true';
 
     // Now, fetch the file blob within the page context using the stolen headers
     const b64 = await page.evaluate(async (url, headers) => {
         const res = await fetch(url, { headers });
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         const blob = await res.blob();
         return new Promise(resolve => {
             const reader = new FileReader();
@@ -85,6 +86,10 @@ export async function GET(request) {
     const mimeType = b64.split(';')[0].split(':')[1];
 
     const buffer = Buffer.from(base64Data, 'base64');
+
+    if (extractText) {
+        return NextResponse.json({ success: true, base64: base64Data, text: "PDF enviado como base64" });
+    }
 
     return new NextResponse(buffer, {
         headers: {

@@ -1,12 +1,16 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause } from 'lucide-react';
+import { Play, Pause, Zap, List, BookOpen, CheckCircle } from 'lucide-react';
 import Filters from './Filters';
 import DataTable from './DataTable';
 import RefreshButton from './RefreshButton';
 import DetailModal from './DetailModal';
+import RecommendationsPanel from './RecommendationsPanel';
+import Top20View from './Top20View';
+import MarketIntelligenceView from './MarketIntelligenceView';
 
 export default function Dashboard() {
+  const [activeTab, setActiveTab] = useState('explorer');
   const [data, setData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -15,6 +19,7 @@ export default function Dashboard() {
   const [isSyncPaused, setIsSyncPaused] = useState(false);
   const isSyncPausedRef = useRef(false);
   const [error, setError] = useState(null);
+  const [submittedBids, setSubmittedBids] = useState({});
   
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -23,6 +28,12 @@ export default function Dashboard() {
   const [excelData, setExcelData] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [isRefreshingExcel, setIsRefreshingExcel] = useState(false);
+
+  // Background Vetting State
+  const [vettedData, setVettedData] = useState([]);
+  const vettingQueueRef = useRef([]);
+  const isVettingRef = useRef(false);
+  const processedIdsRef = useRef(new Set());
 
   const [filters, setFilters] = useState({
     search: '',
@@ -34,6 +45,21 @@ export default function Dashboard() {
   const syncRef = useRef(false);
 
   useEffect(() => {
+    try {
+        const saved = localStorage.getItem('comprasAgilesSubmittedBids');
+        if (saved) {
+            setSubmittedBids(JSON.parse(saved));
+        }
+    } catch (e) { console.error('Error loading submitted bids', e); }
+  }, []);
+
+  useEffect(() => {
+      try {
+          localStorage.setItem('comprasAgilesSubmittedBids', JSON.stringify(submittedBids));
+      } catch (e) { console.error('Error saving submitted bids', e); }
+  }, [submittedBids]);
+
+  useEffect(() => {
     isSyncPausedRef.current = isSyncPaused;
   }, [isSyncPaused]);
 
@@ -43,16 +69,73 @@ export default function Dashboard() {
     "8": "Biobío", "9": "Araucanía", "14": "Los Ríos", "10": "Los Lagos", "11": "Aysén", "12": "Magallanes"
   };
 
+  const calculateBiScore = (item) => {
+      let score = 0;
+      let reasons = [];
+      const titleLower = (item.name || '').toLowerCase();
+      const complexKeywords = ['anexo', 'adjunto', 'bases', 'archivo', 'segun detalle', 'según detalle', 'ver especificacion', 'según especificaciones', 'segun especificaciones', 's/anexo', 'según correo'];
+      if (complexKeywords.some(kw => titleLower.includes(kw))) score -= 2000;
+      if (item.callNumber === 2) { score += 50; reasons.push('2do Llamado (+50)'); }
+      const isPublicada = item.statusName?.toLowerCase()?.includes('publicada');
+      if (!isPublicada) score -= 1000;
+      const price = Number(item.price || item.monto_disponible_CLP || 0);
+      if (price >= 100000 && price <= 1500000) { score += 20; reasons.push('Presupuesto Óptimo (+20)'); }
+      else if (price > 1500000) { score += 10; reasons.push('Alto Presupuesto (+10)'); }
+      else if (price > 0 && price < 50000) { score -= 10; reasons.push('Bajo Presupuesto (-10)'); }
+      const techKeywords = ['software', 'licencia', 'computador', 'notebook', 'servidor', 'tecnología', 'impresora', 'toner'];
+      if (techKeywords.some(kw => titleLower.includes(kw))) { score += 15; reasons.push('Sector Rentable (+15)'); }
+      let dDays = 0;
+      if (typeof item.deliveryDays === 'number') dDays = item.deliveryDays;
+      else if (item.deliveryDays && item.deliveryDays.toString() !== 'Ver detalle') {
+          const match = item.deliveryDays.toString().match(/\d+/);
+          if (match) dDays = parseInt(match[0]);
+      }
+      if (dDays > 5) { score += 15; reasons.push('Plazo Holgado (+15)'); }
+      else if (dDays > 0 && dDays <= 2) { score -= 10; reasons.push('Plazo Corto (-10)'); }
+      
+      return { ...item, biScore: score, biReasons: reasons };
+  };
+
+  useEffect(() => {
+      const processVettingQueue = async () => {
+          if (isVettingRef.current || vettingQueueRef.current.length === 0) return;
+          isVettingRef.current = true;
+          
+          while (vettingQueueRef.current.length > 0) {
+              const candidate = vettingQueueRef.current.shift();
+              try {
+                  const res = await fetch(`/api/scrape-detail?id=${candidate.id}`);
+                  const json = await res.json();
+                  if (json.success && json.data) {
+                      const descLower = (json.data.descripcion || '').toLowerCase();
+                      const COMPLEX_DESC = ['anexo', 'adjunto', 'archivo adjunto', 'ver archivo', 'ver anexo', 'ver detalle adjunto', 'según anexo', 'segun anexo', 'según especificaciones', 'bases adjuntas'];
+                      if (descLower.length >= 20 && !COMPLEX_DESC.some(kw => descLower.includes(kw))) {
+                          candidate.biReasons.push('100% Simple (Sin Anexos)');
+                          candidate.descriptionPreview = json.data.descripcion;
+                          setVettedData(prev => {
+                              if (prev.some(p => p.id === candidate.id)) return prev;
+                              return [...prev, candidate].sort((a,b) => b.biScore - a.biScore);
+                          });
+                      }
+                  }
+              } catch (e) { console.error('Vetting Error', e); }
+          }
+          isVettingRef.current = false;
+      };
+      
+      const interval = setInterval(processVettingQueue, 2000);
+      return () => clearInterval(interval);
+  }, []);
+
   const fetchAllRemainingPages = async (startPage, totalPages, accumulatedData) => {
     setIsBackgroundLoading(true);
     let currentData = [...accumulatedData];
     
-    const BATCH_SIZE = 2; // Reducido a 2 para evitar ahogar el servidor (Timeouts)
+    const BATCH_SIZE = 2;
     let p = startPage;
     
     while (p <= totalPages) {
       if (isSyncPausedRef.current) {
-        // Pausar iteración verificando el semáforo cada 500ms sin perder progreso
         await new Promise(r => setTimeout(r, 500));
         continue;
       }
@@ -69,7 +152,7 @@ export default function Dashboard() {
                 throw new Error('No data or success flag missing');
               } catch (e) {
                 if (attempt === 3) return null;
-                await new Promise(res => setTimeout(res, 2000 * attempt)); // Esperar antes de reintentar
+                await new Promise(res => setTimeout(res, 2000 * attempt));
               }
             }
             return null;
@@ -87,6 +170,16 @@ export default function Dashboard() {
           if (result && result.success && result.data) {
             currentData = [...currentData, ...result.data];
             batchHasData = true;
+            
+            result.data.forEach(item => {
+                if (processedIdsRef.current.has(item.id)) return;
+                processedIdsRef.current.add(item.id);
+                const scoredItem = calculateBiScore(item);
+                if (scoredItem.biScore >= 0) {
+                    vettingQueueRef.current.push(scoredItem);
+                }
+            });
+            vettingQueueRef.current.sort((a,b) => b.biScore - a.biScore);
           }
         }
         
@@ -103,13 +196,11 @@ export default function Dashboard() {
   };
 
   const fetchData = async () => {
-    if (filters.callNumber === '2' && excelData) return; // Disable API fetch only if we are querying Segundo Llamado and have excelData
+    if (filters.callNumber === '2' && excelData) return;
     
-    // Solo mostramos loader bloqueante si no tenemos data previa
     if (data.length === 0) setIsLoading(true);
     setError(null);
     try {
-      // Siempre traemos la página 1 sin filtros para llenar la base local
       const res = await fetch(`/api/scrape?page=1`);
       const result = await res.json();
       
@@ -124,8 +215,16 @@ export default function Dashboard() {
       
       setData(newData);
       setTotalCount(newTotal);
+      
+      newData.forEach(item => {
+          if (!processedIdsRef.current.has(item.id)) {
+              processedIdsRef.current.add(item.id);
+              const scoredItem = calculateBiScore(item);
+              if (scoredItem.biScore >= 0) vettingQueueRef.current.push(scoredItem);
+          }
+      });
+      vettingQueueRef.current.sort((a,b) => b.biScore - a.biScore);
 
-      // Si hay más páginas, iniciar descarga silenciosa
       const totalPages = Math.ceil(newTotal / 15);
       if (totalPages > 1) {
         fetchAllRemainingPages(2, totalPages, newData);
@@ -138,7 +237,6 @@ export default function Dashboard() {
     }
   };
 
-  // Automated Excel Sync
   const syncExcelData = async () => {
     setIsRefreshingExcel(true);
     try {
@@ -157,40 +255,47 @@ export default function Dashboard() {
 
   const handleRefreshAll = () => {
     setPage(1);
-    fetchData(1, filters);
-    // Solo forzar recarga de Excel si ya estábamos en modo Segundo Llamado
+    fetchData();
     if (filters.callNumber === '2') {
       syncExcelData();
     }
   };
 
   useEffect(() => {
-    if (data.length === 0 && !syncRef.current) {
-      syncRef.current = true;
-      fetchData();
-      syncExcelData(); // Auto-start the Excel Bypass immediately on load
+    if (!syncRef.current) {
+        syncRef.current = true;
+        fetchData();
+        syncExcelData();
     }
   }, []);
 
-  // Whenever filters change, reset page
   useEffect(() => {
     setPage(1);
-    
-    // Si eligen Segundo Llamado y NO tenemos la data de Excel, iniciar descarga
     if (filters.callNumber === '2' && !excelData) {
       syncExcelData();
     }
   }, [filters.search, filters.region, filters.status, filters.callNumber]);
 
-  // Local filtering for both API mode and Excel mode
   useEffect(() => {
-    // Definir la base de datos a filtrar
-    let baseData = data;
-    if (filters.callNumber === '2' && excelData && excelData.length > 0) {
-      baseData = excelData;
+    const dataMap = new Map();
+    
+    data.forEach(item => {
+        if (item && item.id) dataMap.set(item.id, item);
+    });
+    
+    if (excelData && Array.isArray(excelData)) {
+        excelData.forEach(item => {
+            if (item && item.id) {
+                if (dataMap.has(item.id)) {
+                    dataMap.set(item.id, { ...dataMap.get(item.id), ...item, _rawExcel: false });
+                } else {
+                    dataMap.set(item.id, item);
+                }
+            }
+        });
     }
 
-    let result = [...baseData];
+    let result = Array.from(dataMap.values()).filter(item => !submittedBids[item.id]);
     
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
@@ -224,7 +329,7 @@ export default function Dashboard() {
     const paginated = result.slice(startIndex, startIndex + itemsPerPage);
     
     setFilteredData(paginated);
-  }, [data, excelData, filters, page]);
+  }, [data, excelData, filters, page, submittedBids]);
 
   const handleNextPage = () => {
       const nextPage = page + 1;
@@ -240,6 +345,7 @@ export default function Dashboard() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px', background: 'rgba(0,0,0,0.2)', padding: '15px', borderRadius: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
           <RefreshButton onRefresh={handleRefreshAll} isLoading={isLoading || isRefreshingExcel} />
@@ -249,9 +355,58 @@ export default function Dashboard() {
             </span>
           )}
         </div>
-        {error && <span style={{ color: 'var(--danger-color)', fontSize: '0.9rem' }}>{error}</span>}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          {error && <span style={{ color: 'var(--danger-color)', fontSize: '0.9rem' }}>{error}</span>}
+        </div>
       </div>
       
+      <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+          <button
+              onClick={() => setActiveTab('explorer')}
+              style={{
+                  padding: '12px 24px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', transition: '0.2s',
+                  background: activeTab === 'explorer' ? 'var(--primary-color)' : 'rgba(255,255,255,0.05)',
+                  color: activeTab === 'explorer' ? 'white' : 'var(--text-secondary)'
+              }}
+          >
+              <List size={18} /> Explorador General
+          </button>
+          <button
+              onClick={() => setActiveTab('suggested')}
+              style={{
+                  padding: '12px 24px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', transition: '0.2s',
+                  background: activeTab === 'suggested' ? '#8b5cf6' : 'rgba(255,255,255,0.05)',
+                  color: activeTab === 'suggested' ? 'white' : 'var(--text-secondary)'
+              }}
+          >
+              <Zap size={18} /> Licitaciones Sugeridas
+          </button>
+          <button
+              onClick={() => setActiveTab('intelligence')}
+              style={{
+                  padding: '12px 24px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', transition: '0.2s',
+                  background: activeTab === 'intelligence' ? '#10b981' : 'rgba(255,255,255,0.05)',
+                  color: activeTab === 'intelligence' ? 'white' : 'var(--text-secondary)'
+              }}
+          >
+              <BookOpen size={18} /> Inteligencia Histórica
+          </button>
+          <button
+              onClick={() => setActiveTab('submitted')}
+              style={{
+                  padding: '12px 24px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', transition: '0.2s',
+                  background: activeTab === 'submitted' ? '#3b82f6' : 'rgba(255,255,255,0.05)',
+                  color: activeTab === 'submitted' ? 'white' : 'var(--text-secondary)'
+              }}
+          >
+              <CheckCircle size={18} /> Licitaciones Postuladas
+          </button>
+      </div>
+  
       {isBackgroundLoading && (
         <div className="glass-panel animate-fade-in" style={{ padding: '15px 20px', display: 'flex', alignItems: 'center', gap: '15px', background: isSyncPaused ? 'rgba(245, 158, 11, 0.1)' : 'rgba(59, 130, 246, 0.1)', border: `1px solid ${isSyncPaused ? '#f59e0b' : 'var(--accent-color)'}` }}>
           {!isSyncPaused && <div style={{ width: '20px', height: '20px', border: '2px solid rgba(255,255,255,0.2)', borderTopColor: 'var(--accent-color)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>}
@@ -294,45 +449,132 @@ export default function Dashboard() {
         </div>
       )}
 
-      <Filters filters={filters} setFilters={setFilters} />
-      
-      <DataTable 
-         data={filteredData} 
-         onRowClick={setSelectedItem} 
-         isLoading={isLoading} 
-         isRefreshingExcel={isRefreshingExcel}
-      />
-      
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
-             <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                 {totalCount > 0 ? `Mostrando ${filteredData.length} resultados en esta página (Total en sistema: ${totalCount})` : 'No se encontraron resultados.'}
-             </span>
-             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                 <button 
-                    onClick={handlePrevPage} 
-                    disabled={page === 1 || isLoading}
-                    style={{
-                        padding: '8px 16px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-                        color: 'white', borderRadius: '8px', cursor: (page === 1 || isLoading) ? 'not-allowed' : 'pointer', opacity: (page === 1 || isLoading) ? 0.5 : 1
-                    }}>
-                     Anterior
-                 </button>
-                 <span style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.1)', borderRadius: '8px', color: 'var(--accent-color)', fontWeight: 'bold', minWidth: '100px', textAlign: 'center' }}>
-                    Página {page}
-                 </span>
-                 <button 
-                    onClick={handleNextPage} 
-                    disabled={page * 15 >= totalCount}
-                    style={{
-                        padding: '8px 16px', background: 'var(--primary-color)', border: 'none',
-                        color: 'white', borderRadius: '8px', cursor: (page * 15 >= totalCount) ? 'not-allowed' : 'pointer', opacity: (page * 15 >= totalCount) ? 0.5 : 1
-                    }}>
-                     Siguiente
-                 </button>
-             </div>
+      {activeTab === 'intelligence' && (
+          <MarketIntelligenceView />
+      )}
+
+      {activeTab === 'explorer' && (
+          <>
+              <Filters filters={filters} setFilters={setFilters} />
+              <RecommendationsPanel budget={Number(filters.maxPrice) || 0} region={filters.region} />
+              
+              <DataTable 
+                 data={filteredData} 
+                 onRowClick={setSelectedItem} 
+                 isLoading={isLoading} 
+                 isRefreshingExcel={isRefreshingExcel}
+              />
+              
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
+                     <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                         {totalCount > 0 ? `Mostrando ${filteredData.length} resultados en esta página (Total en sistema: ${totalCount})` : 'No se encontraron resultados.'}
+                     </span>
+                     <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                         <button 
+                            onClick={handlePrevPage} 
+                            disabled={page === 1 || isLoading}
+                            style={{
+                                padding: '8px 16px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                                color: 'white', borderRadius: '8px', cursor: (page === 1 || isLoading) ? 'not-allowed' : 'pointer', opacity: (page === 1 || isLoading) ? 0.5 : 1
+                            }}>
+                             Anterior
+                         </button>
+                         <span style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.1)', borderRadius: '8px', color: 'var(--accent-color)', fontWeight: 'bold', minWidth: '100px', textAlign: 'center' }}>
+                            Página {page}
+                         </span>
+                         <button 
+                            onClick={handleNextPage} 
+                            disabled={page * 15 >= totalCount}
+                            style={{
+                                padding: '8px 16px', background: 'var(--primary-color)', border: 'none',
+                                color: 'white', borderRadius: '8px', cursor: (page * 15 >= totalCount) ? 'not-allowed' : 'pointer', opacity: (page * 15 >= totalCount) ? 0.5 : 1
+                            }}>
+                             Siguiente
+                         </button>
+                     </div>
+              </div>
+          </>
+      )}
+
+      {activeTab === 'suggested' && (
+          <>
+              <div style={{ marginBottom: '15px' }}>
+                 <Filters filters={filters} setFilters={setFilters} />
+              </div>
+              <Top20View 
+                 data={vettedData.filter(item => !submittedBids[item.id])} 
+                 filters={filters} 
+              />
+          </>
+      )}
+
+      {activeTab === 'submitted' && (
+          <div className="glass-panel" style={{ padding: '25px', animation: 'fadeIn 0.5s ease-in-out' }}>
+              <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#3b82f6', margin: '0 0 20px 0' }}>
+                  <CheckCircle size={28} />
+                  Licitaciones Postuladas
+              </h2>
+              {Object.keys(submittedBids).length === 0 ? (
+                  <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                      No tienes licitaciones marcadas como postuladas todavía.
+                  </div>
+              ) : (
+                  <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                          <thead>
+                              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                                  <th style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>ID Licitación</th>
+                                  <th style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>Título</th>
+                                  <th style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>Fecha Postulación</th>
+                                  <th style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>Precio PDF</th>
+                                  <th style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>Acción</th>
+                              </tr>
+                          </thead>
+                          <tbody>
+                              {Object.values(submittedBids).map((bid) => (
+                                  <tr key={bid.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                      <td style={{ padding: '15px 10px', color: '#60a5fa' }}>{bid.id}</td>
+                                      <td style={{ padding: '15px 10px', color: 'white' }}>{bid.name}</td>
+                                      <td style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>{bid.submittedAt}</td>
+                                      <td style={{ padding: '15px 10px', color: '#10b981', fontWeight: 'bold' }}>{bid.quotedPrice}</td>
+                                      <td style={{ padding: '15px 10px' }}>
+                                          <button 
+                                              onClick={() => {
+                                                  const newBids = {...submittedBids};
+                                                  delete newBids[bid.id];
+                                                  setSubmittedBids(newBids);
+                                              }}
+                                              style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: 'none', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer' }}
+                                          >
+                                              Eliminar
+                                          </button>
+                                      </td>
+                                  </tr>
+                              ))}
+                          </tbody>
+                      </table>
+                  </div>
+              )}
           </div>
+      )}
+      
       {selectedItem && (
-        <DetailModal item={selectedItem} onClose={() => setSelectedItem(null)} />
+        <DetailModal 
+            item={selectedItem} 
+            onClose={() => setSelectedItem(null)} 
+            onMarkSubmitted={(quoteInfo) => {
+                setSubmittedBids(prev => ({
+                    ...prev,
+                    [selectedItem.id]: {
+                        id: selectedItem.id,
+                        name: selectedItem.name,
+                        submittedAt: new Date().toLocaleString('es-CL'),
+                        quotedPrice: quoteInfo?.price || 'N/A'
+                    }
+                }));
+                setSelectedItem(null);
+            }}
+        />
       )}
     </div>
   );
