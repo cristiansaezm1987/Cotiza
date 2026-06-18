@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { openDB } from '../../../lib/db';
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import fs from 'fs';
@@ -130,8 +131,44 @@ export async function GET(req) {
       };
     }).filter(item => item.id);
 
-    updateStatus('excel', { active: false, progress: 100, message: 'Descarga de Excel completada.' });
-    return NextResponse.json({ success: true, data: transformedData });
+    const db = await openDB();
+    const now = new Date().toISOString();
+    updateStatus('excel', { active: true, progress: 80, message: 'Guardando datos en Turso...' });
+
+    const chunkSize = 50;
+    for (let i = 0; i < transformedData.length; i += chunkSize) {
+      const chunk = transformedData.slice(i, i + chunkSize);
+      await Promise.all(chunk.map(item => {
+        return db.run(`
+          INSERT INTO tenders (
+            id, name, status, statusName, date, price, organization, region, closeDate, deliveryDays, callNumber, lastUpdated
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            name=excluded.name,
+            statusName=excluded.statusName,
+            price=excluded.price,
+            lastUpdated=excluded.lastUpdated,
+            callNumber=excluded.callNumber
+        `, [
+          item.id,
+          item.name || '',
+          '',
+          item.statusName || '',
+          item.date || '',
+          item.price || 0,
+          item.organization || '',
+          item.region || '',
+          item.closeDate || '',
+          item.deliveryDays || '',
+          item.callNumber,
+          now
+        ]);
+      }));
+    }
+
+    updateStatus('excel', { active: false, progress: 100, message: 'Descarga de Excel completada y datos guardados.' });
+    // Return count instead of 8000 rows to save memory
+    return NextResponse.json({ success: true, count: transformedData.length });
 
   } catch (error) {
     console.error('Excel Download Error:', error);

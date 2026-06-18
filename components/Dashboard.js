@@ -25,14 +25,11 @@ export default function Dashboard() {
   const [totalCount, setTotalCount] = useState(0);
   const [selectedItem, setSelectedItem] = useState(null);
 
-  const [excelData, setExcelData] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
-  const [isRefreshingExcel, setIsRefreshingExcel] = useState(false);
 
   const [syncStatus, setSyncStatus] = useState({
     incremental: { active: false, progress: 0, message: '' },
-    full: { active: false, progress: 0, message: '' },
-    excel: { active: false, progress: 0, message: '' }
+    full: { active: false, progress: 0, message: '' }
   });
 
   const [dbStats, setDbStats] = useState({ totalCount: 0, lastSync: null });
@@ -75,9 +72,8 @@ export default function Dashboard() {
   useEffect(() => {
       const handleSyncFinished = () => {
           setPage(1);
-          // Only fetch DB data, not excel unless needed
+          // Only fetch DB data
           if (typeof window !== 'undefined') {
-              // find fetchData somehow... wait, we can just trigger handleRefreshAll, but we don't have it here.
               // We'll define a global event listener later in the component.
           }
       };
@@ -273,8 +269,6 @@ export default function Dashboard() {
   };
 
   const fetchData = async () => {
-    if (filters.callNumber === '2' && excelData) return;
-    
     if (data.length === 0) setIsLoading(true);
     setError(null);
     try {
@@ -314,37 +308,9 @@ export default function Dashboard() {
     }
   };
 
-  const syncExcelData = async () => {
-    setIsRefreshingExcel(true);
-    try {
-      const res = await fetch('/api/excel');
-      const result = await res.json();
-      if (result.success && result.data) {
-        setExcelData(result.data);
-        setLastUpdate(new Date().toLocaleString('es-CL'));
-        
-        result.data.forEach(item => {
-            if (!processedIdsRef.current.has(item.id)) {
-                processedIdsRef.current.add(item.id);
-                const scoredItem = calculateBiScore(item);
-                if (scoredItem.biScore >= 0) vettingQueueRef.current.push(scoredItem);
-            }
-        });
-        vettingQueueRef.current.sort((a,b) => b.biScore - a.biScore);
-      }
-    } catch (err) {
-      console.error('Error syncing Excel data:', err);
-    } finally {
-      setIsRefreshingExcel(false);
-    }
-  };
-
   const handleRefreshAll = () => {
     setPage(1);
     fetchData();
-    if (filters.callNumber === '2') {
-      syncExcelData();
-    }
   };
 
   useEffect(() => {
@@ -359,15 +325,11 @@ export default function Dashboard() {
     if (!syncRef.current) {
         syncRef.current = true;
         fetchData();
-        syncExcelData();
     }
   }, []);
 
   useEffect(() => {
     setPage(1);
-    if (filters.callNumber === '2' && !excelData) {
-      syncExcelData();
-    }
   }, [filters.search, filters.region, filters.status, filters.callNumber]);
 
   useEffect(() => {
@@ -376,18 +338,6 @@ export default function Dashboard() {
     data.forEach(item => {
         if (item && item.id) dataMap.set(item.id, item);
     });
-    
-    if (excelData && Array.isArray(excelData)) {
-        excelData.forEach(item => {
-            if (item && item.id) {
-                if (dataMap.has(item.id)) {
-                    dataMap.set(item.id, { ...dataMap.get(item.id), ...item, _rawExcel: false });
-                } else {
-                    dataMap.set(item.id, item);
-                }
-            }
-        });
-    }
 
     let result = Array.from(dataMap.values()).filter(item => !submittedBids[item.id]);
     
@@ -423,7 +373,7 @@ export default function Dashboard() {
     const paginated = result.slice(startIndex, startIndex + itemsPerPage);
     
     setFilteredData(paginated);
-  }, [data, excelData, filters, page, submittedBids]);
+  }, [data, filters, page, submittedBids]);
 
   const handleNextPage = () => {
       const nextPage = page + 1;
@@ -442,12 +392,7 @@ export default function Dashboard() {
       
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px', background: 'rgba(0,0,0,0.2)', padding: '15px', borderRadius: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          <RefreshButton onRefresh={handleRefreshAll} isLoading={isLoading || isRefreshingExcel} />
-          {lastUpdate && (
-            <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-              Última actualización Excel: {lastUpdate}
-            </span>
-          )}
+          <RefreshButton onRefresh={handleRefreshAll} isLoading={isLoading} />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
           {error && <span style={{ color: 'var(--danger-color)', fontSize: '0.9rem' }}>{error}</span>}
@@ -554,10 +499,9 @@ export default function Dashboard() {
 
                  <button 
                      onClick={async () => { fetch('/api/excel'); }}
-                     disabled={syncStatus.excel.active}
                      style={{ 
                          background: '#10b981', border: 'none', color: 'white', 
-                         padding: '6px 12px', borderRadius: '6px', cursor: syncStatus.excel.active ? 'not-allowed' : 'pointer',
+                         padding: '6px 12px', borderRadius: '6px', cursor: 'pointer',
                          fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem'
                      }}
                  >
@@ -590,20 +534,6 @@ export default function Dashboard() {
                     </div>
                 )}
             </div>
-
-            {/* Excel / Segundos Llamados */}
-            <div style={{ background: 'rgba(0,0,0,0.2)', padding: '10px 14px', borderRadius: '8px', borderLeft: '4px solid #10b981' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#10b981', marginBottom: '4px', fontWeight: 'bold' }}>
-                    <span>Estado: Base Excel (Segundos Llamados)</span>
-                    <span>{excelData ? `${excelData.length} registros en memoria` : 'No descargado en esta sesión'}</span>
-                </div>
-                {syncStatus.excel.active ? (
-                    <>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                            <span>{syncStatus.excel.message}</span>
-                            <span>{Math.round(syncStatus.excel.progress)}%</span>
-                        </div>
-                        <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
                             <div style={{ height: '100%', background: '#10b981', width: `${syncStatus.excel.progress}%`, transition: 'width 0.3s' }} />
                         </div>
                     </>
