@@ -576,7 +576,7 @@ export default function Dashboard() {
                  data={filteredData} 
                  onRowClick={setSelectedItem} 
                  isLoading={isLoading} 
-                 isRefreshingExcel={isRefreshingExcel}
+                 isRefreshingExcel={syncStatus.excel?.active}
               />
               
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
