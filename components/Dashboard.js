@@ -29,7 +29,8 @@ export default function Dashboard() {
 
   const [syncStatus, setSyncStatus] = useState({
     incremental: { active: false, progress: 0, message: '' },
-    full: { active: false, progress: 0, message: '' }
+    full: { active: false, progress: 0, message: '' },
+    excel: { active: false, progress: 0, message: '' }
   });
 
   const [dbStats, setDbStats] = useState({ totalCount: 0, lastSync: null });
@@ -534,27 +535,33 @@ export default function Dashboard() {
                     </div>
                 )}
             </div>
+
+            {/* Excel Status Bar */}
+            <div style={{ background: 'rgba(0,0,0,0.2)', padding: '10px 14px', borderRadius: '8px', borderLeft: '4px solid #10b981' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#10b981', marginBottom: '4px', fontWeight: 'bold' }}>
+                    <span>Estado: Base Excel (Segundos Llamados)</span>
+                    <span>Guardado en Nube (Turso)</span>
+                </div>
+                {syncStatus.excel && syncStatus.excel.active ? (
+                    <>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                            <span>{syncStatus.excel.message}</span>
+                            <span>{Math.round(syncStatus.excel.progress)}%</span>
+                        </div>
+                        <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
                             <div style={{ height: '100%', background: '#10b981', width: `${syncStatus.excel.progress}%`, transition: 'width 0.3s' }} />
                         </div>
                     </>
                 ) : (
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                        {excelData ? 'Excel procesado con éxito.' : 'Presiona "Descargar Excel" para traer los segundos llamados del día.'}
+                        Presiona "Descargar Excel" en tu servidor local para actualizar los datos en la nube.
                     </div>
                 )}
             </div>
          </div>
       </div>
   
-      {isRefreshingExcel && (
-        <div className="glass-panel" style={{ padding: '20px', textAlign: 'center', background: 'rgba(0, 198, 255, 0.1)', border: '1px solid var(--accent-color)' }}>
-          <h3 style={{ color: 'var(--accent-color)', marginBottom: '10px' }}>Bypass en progreso: Descargando datos ocultos...</h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '15px' }}>Esto puede tardar hasta 15 segundos debido a la encriptación de Mercado Público.</p>
-          <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
-            <div className="loading-bar-inner" style={{ width: '50%', height: '100%', background: 'linear-gradient(90deg, #00c6ff, var(--accent-color))', animation: 'progress 2s ease-in-out infinite' }}></div>
-          </div>
-        </div>
-      )}
+
 
       {activeTab === 'intelligence' && (
           <MarketIntelligenceView />
