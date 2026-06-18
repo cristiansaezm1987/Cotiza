@@ -135,11 +135,11 @@ export async function GET(req) {
     const now = new Date().toISOString();
     updateStatus('excel', { active: true, progress: 80, message: 'Guardando datos en Turso...' });
 
-    const chunkSize = 50;
+    const chunkSize = 100;
     for (let i = 0; i < transformedData.length; i += chunkSize) {
       const chunk = transformedData.slice(i, i + chunkSize);
-      await Promise.all(chunk.map(item => {
-        return db.run(`
+      
+      const sql = `
           INSERT INTO tenders (
             id, name, status, statusName, date, price, organization, region, closeDate, deliveryDays, callNumber, lastUpdated
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -149,21 +149,27 @@ export async function GET(req) {
             price=excluded.price,
             lastUpdated=excluded.lastUpdated,
             callNumber=excluded.callNumber
-        `, [
-          item.id,
-          item.name || '',
-          '',
-          item.statusName || '',
-          item.date || '',
-          item.price || 0,
-          item.organization || '',
-          item.region || '',
-          item.closeDate || '',
-          item.deliveryDays || '',
-          item.callNumber,
-          now
-        ]);
-      }));
+      `;
+
+      if (db.client && typeof db.client.batch === 'function') {
+        const statements = chunk.map(item => ({
+          sql,
+          args: [
+            item.id, item.name || '', '', item.statusName || '', item.date || '', item.price || 0,
+            item.organization || '', item.region || '', item.closeDate || '', item.deliveryDays || '', item.callNumber, now
+          ]
+        }));
+        await db.client.batch(statements, 'write');
+      } else {
+        for (const item of chunk) {
+          await db.run(sql, [
+            item.id, item.name || '', '', item.statusName || '', item.date || '', item.price || 0,
+            item.organization || '', item.region || '', item.closeDate || '', item.deliveryDays || '', item.callNumber, now
+          ]);
+        }
+      }
+      
+      updateStatus('excel', { active: true, progress: 80 + Math.floor((i / transformedData.length) * 19), message: `Guardando datos en Turso... ${Math.min(i + chunkSize, transformedData.length)}/${transformedData.length}` });
     }
 
     updateStatus('excel', { active: false, progress: 100, message: 'Descarga de Excel completada y datos guardados.' });
