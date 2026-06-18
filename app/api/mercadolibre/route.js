@@ -1,101 +1,7 @@
 import { NextResponse } from 'next/server';
-import * as cheerio from 'cheerio';
+import { GoogleGenAI } from '@google/genai';
 
 export const maxDuration = 60;
-
-async function scrapeDuckDuckGo(query, count = 20) {
-    try {
-        const response = await fetch(`https://html.duckduckgo.com/html/?q=site:articulo.mercadolibre.cl+${encodeURIComponent(query)}`, {
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
-        });
-        const html = await response.text();
-        const $ = cheerio.load(html);
-        const results = [];
-        
-        $('.result__body').each((i, el) => {
-            if (results.length >= count) return;
-            
-            const title = $(el).find('.result__title a').text().trim();
-            const url = $(el).find('.result__snippet').attr('href') || $(el).find('.result__url').attr('href');
-            const snippet = $(el).find('.result__snippet').text() || '';
-            
-            // Try to extract price from snippet (e.g., $15.990)
-            let price = 0;
-            const priceMatch = snippet.match(/\$ ?([0-9.,]+)/);
-            if (priceMatch) {
-                price = parseInt(priceMatch[1].replace(/[.,]/g, ''), 10);
-            }
-            if (!price || price < 500) {
-                // Fallback deterministic price if none found
-                let hash = 0;
-                for (let j = 0; j < title.length; j++) hash = title.charCodeAt(j) + ((hash << 5) - hash);
-                price = (Math.abs(hash % 90000) + 10000);
-                price = Math.round(price / 1000) * 1000 - 10;
-            }
-
-            if (title && url) {
-                results.push({
-                    id: `MLC-${Math.floor(Math.random() * 1000000000)}`,
-                    title: title,
-                    description: snippet,
-                    price: price,
-                    currency: 'CLP',
-                    thumbnail: 'https://http2.mlstatic.com/frontend-assets/ui-navigation/5.19.1/mercadolibre/logo__small.png',
-                    permalink: url.startsWith('//') ? 'https:' + url : url,
-                    condition: 'new',
-                    shipping: 'Calculado',
-                    source: 'Mercado Libre Oficial'
-                });
-            }
-        });
-        if (results.length === 0) {
-            // Fallback: Generate realistic mock data if scraper is blocked
-            for (let i = 0; i < count; i++) {
-                const brands = ['HP', 'Epson', 'Lenovo', 'Dell', 'Samsung', 'LG', 'Logitech', 'Sony', 'Canon', 'Brother'];
-                const brand = brands[Math.floor(Math.random() * brands.length)];
-                
-                let hash = 0;
-                const seed = query + i;
-                for (let j = 0; j < seed.length; j++) hash = seed.charCodeAt(j) + ((hash << 5) - hash);
-                const price = Math.round((Math.abs(hash % 900000) + 10000) / 1000) * 1000 - 10;
-                
-                results.push({
-                    id: `MLC-${Math.floor(Math.random() * 1000000000)}`,
-                    title: `${query} ${brand} Original Nuevo Sellado`,
-                    description: `Excelente ${query.toLowerCase()} marca ${brand}, con garantía oficial.`,
-                    price: price,
-                    currency: 'CLP',
-                    thumbnail: 'https://http2.mlstatic.com/frontend-assets/ui-navigation/5.19.1/mercadolibre/logo__small.png',
-                    permalink: `https://articulo.mercadolibre.cl/MLC-${Math.floor(Math.random() * 1000000000)}-producto`,
-                    condition: 'new',
-                    shipping: 'Calculado',
-                    source: 'Mercado Libre (Mock)'
-                });
-            }
-        }
-        
-        return results;
-    } catch (e) {
-        console.error("Error scraping DDG:", e);
-        // Fallback catch
-        const results = [];
-        for (let i = 0; i < count; i++) {
-            results.push({
-                id: `MLC-${Math.floor(Math.random() * 1000000000)}`,
-                title: `${query} Genérico`,
-                description: `Producto genérico para ${query}.`,
-                price: 15990,
-                currency: 'CLP',
-                thumbnail: 'https://http2.mlstatic.com/frontend-assets/ui-navigation/5.19.1/mercadolibre/logo__small.png',
-                permalink: `https://articulo.mercadolibre.cl/MLC-0000000-producto`,
-                condition: 'new',
-                shipping: 'Calculado',
-                source: 'Mercado Libre (Mock)'
-            });
-        }
-        return results;
-    }
-}
 
 export async function GET(request) {
   try {
@@ -106,12 +12,59 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Falta el parámetro de búsqueda (q)' }, { status: 400 });
     }
 
-    const realResults = await scrapeDuckDuckGo(query, 20);
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const prompt = `El siguiente texto es un requerimiento de compra o un ítem: "${query}".
+Primero, identifica de manera inteligente cuál es el producto físico principal que se necesita comprar (ignora texto burocrático como "adquisición de", "provisión", etc.).
+Luego, busca 3 productos reales en mercadolibre.cl para ese producto. 
+Usa la herramienta googleSearch para obtener enlaces reales a "articulo.mercadolibre.cl" y sus precios reales.
+Debes devolver ESTRICTAMENTE un JSON válido que sea un arreglo de objetos, con la siguiente estructura:
+[
+  {
+    "title": "Nombre del producto encontrado",
+    "price": 150000,
+    "permalink": "https://articulo.mercadolibre.cl/MLC-12345678-producto-_JM"
+  }
+]
+Si no encuentras productos, devuelve un arreglo vacío []. NO agregues texto adicional, solo el JSON.`;
 
-    return NextResponse.json({ success: true, results: realResults });
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        tools: [{ googleSearch: {} }]
+    });
+
+    let jsonText = response.text.trim();
+    if (jsonText.startsWith('```json')) {
+        jsonText = jsonText.substring(7, jsonText.length - 3);
+    } else if (jsonText.startsWith('```')) {
+        jsonText = jsonText.substring(3, jsonText.length - 3);
+    }
+
+    let parsedResults = [];
+    try {
+        parsedResults = JSON.parse(jsonText);
+    } catch (e) {
+        console.error("Gemini failed to return JSON:", jsonText);
+    }
+
+    // Format the results to match the expected UI format
+    const formattedResults = parsedResults.map((item, index) => ({
+        id: `MLC-GEMINI-${Math.floor(Math.random() * 1000000000)}`,
+        title: item.title || `${query} (Encontrado)`,
+        description: 'Producto encontrado vía IA.',
+        price: item.price || 0,
+        currency: 'CLP',
+        thumbnail: 'https://http2.mlstatic.com/frontend-assets/ui-navigation/5.19.1/mercadolibre/logo__small.png',
+        permalink: item.permalink || '#',
+        condition: 'new',
+        shipping: 'Calculado',
+        source: 'Búsqueda Inteligente'
+    })).filter(item => item.price > 0 && item.permalink !== '#');
+
+    return NextResponse.json({ success: true, results: formattedResults });
 
   } catch (error) {
-    console.error("Error en Búsqueda Manual de Mercado Libre (DDG):", error);
+    console.error("Error en Búsqueda Manual de Mercado Libre (Gemini):", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

@@ -1,135 +1,68 @@
 import { NextResponse } from 'next/server';
-import puppeteerCore from 'puppeteer-core';
-import chromium from '@sparticuz/chromium-min';
-import { addExtra } from 'puppeteer-extra';
-import StealthPlugin from 'puppeteer-extra-plugin-stealth';
-
-export const maxDuration = 60;
+import { openDB } from '../../../lib/db';
 
 export async function GET(request) {
-  let browser;
   try {
-    const isVercel = process.env.VERCEL === "1" || !!process.env.VERCEL;
-
     const searchParams = request.nextUrl.searchParams;
-    const pageParam = searchParams.get('page') || '1';
+    const pageParam = parseInt(searchParams.get('page')) || 1;
     const regionParam = searchParams.get('region') || '';
     const searchKeyword = searchParams.get('search') || '';
     const statusParam = searchParams.get('status') || '';
     
-    console.log(`Starting Scrape. Page: ${pageParam}, Region: ${regionParam}, Status: ${statusParam}`);
+    const db = await openDB();
     
-    let page;
-    try {
-        if (!global.puppeteerBrowser) throw new Error("No browser");
-        page = await global.puppeteerBrowser.newPage();
-    } catch (e) {
-        console.log("Browser disconnected, relaunching...");
-        if (isVercel) {
-          const puppeteerExtraVercel = addExtra(puppeteerCore);
-          puppeteerExtraVercel.use(StealthPlugin());
-          
-          global.puppeteerBrowser = await puppeteerExtraVercel.launch({
-            args: [...chromium.args, '--hide-scrollbars', '--disable-web-security'],
-            defaultViewport: chromium.defaultViewport,
-            executablePath: await chromium.executablePath(
-              'https://github.com/Sparticuz/chromium/releases/download/v149.0.0/chromium-v149.0.0-pack.x64.tar'
-            ),
-            headless: chromium.headless,
-            ignoreHTTPSErrors: true,
-          });
-        } else {
-          const puppeteerExtra = require('puppeteer-extra');
-          const puppeteer = puppeteerExtra.default || puppeteerExtra;
-          const StealthPluginLocal = require('puppeteer-extra-plugin-stealth');
-          puppeteer.use(StealthPluginLocal());
-          
-          global.puppeteerBrowser = await puppeteer.launch({
-            headless: 'new',
-            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security']
-          });
-        }
-        page = await global.puppeteerBrowser.newPage();
+    let query = "SELECT * FROM tenders WHERE 1=1";
+    let countQuery = "SELECT COUNT(*) as count FROM tenders WHERE 1=1";
+    const params = [];
+    
+    if (regionParam && regionParam !== 'all') {
+      query += " AND (region LIKE ? OR region = ?)";
+      countQuery += " AND (region LIKE ? OR region = ?)";
+      params.push(`%${regionParam}%`, regionParam);
     }
-    browser = global.puppeteerBrowser;
-    let interceptedData = null;
-    let totalCount = 0;
-
-    await page.setRequestInterception(true);
     
-    page.on('request', interceptedRequest => {
-        const url = interceptedRequest.url();
-        if (url.includes('api.buscador.mercadopublico.cl/compra-agil?') && interceptedRequest.method() !== 'OPTIONS') {
-            let newUrl = url;
-            newUrl = newUrl.replace(/page_number=\d+/, `page_number=${pageParam}`);
-            if (regionParam) newUrl += `&region=${regionParam}`;
-            if (searchKeyword) newUrl += `&keywords=${encodeURIComponent(searchKeyword)}`;
-            if (statusParam) newUrl = newUrl.replace(/status=\d+/, `status=${statusParam}`);
-            
-            console.log("Rewriting API URL to:", newUrl);
-            interceptedRequest.continue({ url: newUrl });
-        } else {
-            interceptedRequest.continue();
-        }
-    });
-
-    const responsePromise = new Promise(resolve => {
-        page.on('response', async (response) => {
-          const url = response.url();
-          if (response.request().method() !== 'OPTIONS' && url.includes('api.buscador.mercadopublico.cl/compra-agil')) {
-            try {
-              const json = await response.json();
-              if (json && json.payload && json.payload.resultados) {
-                interceptedData = json.payload.resultados;
-                totalCount = json.payload.resultCount || 0;
-              }
-            } catch (e) {
-                console.error("Error parsing JSON:", e);
-            } finally {
-                // Resolve once we either successfully parse or fail to parse the API response
-                resolve();
-            }
-          }
-        });
-    });
-
-    page.goto('https://buscador.mercadopublico.cl/compra-agil').catch(e => console.error("Navigation error:", e));
+    if (searchKeyword) {
+      query += " AND (name LIKE ? OR organization LIKE ?)";
+      countQuery += " AND (name LIKE ? OR organization LIKE ?)";
+      params.push(`%${searchKeyword}%`, `%${searchKeyword}%`);
+    }
     
-    // Wait for the specific API response, with a maximum timeout
-    await Promise.race([
-        responsePromise,
-        new Promise(r => setTimeout(r, 25000))
+    if (statusParam && statusParam !== 'all') {
+      query += " AND status = ?";
+      countQuery += " AND status = ?";
+      params.push(statusParam);
+    }
+    
+    query += " ORDER BY date DESC, id DESC LIMIT 20 OFFSET ?";
+    const countParams = [...params]; // params before adding offset
+    params.push((pageParam - 1) * 20);
+    
+    const [records, countResult] = await Promise.all([
+      db.all(query, params),
+      db.get(countQuery, countParams)
     ]);
+    
+    const totalCount = countResult.count;
+    
+    const formattedData = records.map(item => ({
+      id: item.id,
+      name: item.name,
+      status: item.status,
+      statusName: item.statusName,
+      date: item.date,
+      price: item.price,
+      organization: item.organization,
+      region: item.region,
+      closeDate: item.closeDate,
+      deliveryDays: item.deliveryDays,
+      callNumber: item.callNumber
+    }));
 
-    await page.close();
-
-    if (interceptedData) {
-      let finalData = interceptedData;
-
-      const formattedData = finalData.map(item => ({
-        id: item.codigo,
-        name: item.nombre,
-        status: String(item.id_estado) || '',
-        statusName: item.estado || 'Desconocido',
-        date: item.fecha_publicacion,
-        price: Number(item.monto_disponible_CLP) || Number(item.monto_estimado) || 0,
-        organization: item.organismo,
-        region: item.region || item.unidad || 'N/A', 
-        closeDate: item.fecha_cierre || null,
-        deliveryDays: item.dias_entrega || 'Ver detalle',
-        callNumber: item.estado_convocatoria === 2 ? 2 : 1
-      }));
-
-      return NextResponse.json({ success: true, data: formattedData, totalCount });
-    } else {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'No pudimos interceptar los datos.'
-      });
-    }
+    return NextResponse.json({ success: true, data: formattedData, totalCount });
 
   } catch (error) {
-    console.error('Scraping error:', error);
+    console.error('Database query error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
+

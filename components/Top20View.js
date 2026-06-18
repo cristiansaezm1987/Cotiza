@@ -5,8 +5,11 @@ import DetailModal from './DetailModal';
 export default function Top20View({ data, filters }) {
   const [selectedItem, setSelectedItem] = useState(null);
 
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
+
   // Filter the ALREADY VETTED data by ALL filters
-  const vettedData = React.useMemo(() => {
+  const filteredData = React.useMemo(() => {
     let filtered = data;
     if (filters) {
         if (filters.search) {
@@ -30,10 +33,21 @@ export default function Top20View({ data, filters }) {
            filtered = filtered.filter(item => Number(item.price) <= maxP);
         }
     }
-    return filtered.slice(0, 20); // Show max 20
+    return filtered;
   }, [data, filters]);
 
-  if (vettedData.length === 0) {
+  // Reset page to 1 when filters change
+  React.useEffect(() => {
+      setPage(1);
+  }, [filters]);
+
+  const paginatedData = React.useMemo(() => {
+      return filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  }, [filteredData, page]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredData.length / PAGE_SIZE));
+
+  if (filteredData.length === 0) {
       return (
           <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
               No se encontraron oportunidades suficientes que cumplan los criterios del algoritmo en esta región.
@@ -54,19 +68,19 @@ export default function Top20View({ data, filters }) {
       <div className="glass-panel" style={{ padding: '20px', background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%)', border: '1px solid rgba(139, 92, 246, 0.3)' }}>
          <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--accent-color)', marginBottom: '10px' }}>
              <Zap size={24} color="#8b5cf6" />
-             Top 20 Oportunidades 100% Simples (Tiempo Real)
+             Sugerencias 100% Simples (Tiempo Real)
          </h2>
          <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', marginBottom: '15px' }}>
              A medida que el sistema descarga información, el escáner evalúa silenciosamente en segundo plano. Aquí ves los resultados en tiempo real de las oportunidades más rentables cuya información técnica está directamente en la descripción.
          </p>
          <div style={{ fontSize: '0.85rem', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0,0,0,0.3)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
              <div style={{ width: '12px', height: '12px', background: '#60a5fa', borderRadius: '50%', boxShadow: '0 0 10px #60a5fa', animation: 'pulse 1.5s infinite' }}></div>
-             Escáner continuo activo... ({data.length} oportunidades validadas encontradas)
+             Escáner continuo activo... ({filteredData.length} sugerencias validadas)
          </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '20px' }}>
-        {vettedData.map((item, index) => (
+        {paginatedData.map((item, index) => (
           <div 
             key={item.id} 
             className="glass-panel animate-fade-in" 
@@ -143,6 +157,71 @@ export default function Top20View({ data, filters }) {
           </div>
         ))}
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '5px', marginTop: '20px' }}>
+            <button 
+                onClick={() => setPage(1)} 
+                disabled={page === 1}
+                style={{ padding: '8px 12px', background: 'transparent', border: 'none', color: page === 1 ? 'rgba(255,255,255,0.2)' : 'var(--text-secondary)', cursor: page === 1 ? 'not-allowed' : 'pointer', fontSize: '1.2rem' }}>
+                &laquo;
+            </button>
+            <button 
+                onClick={() => setPage(p => Math.max(1, p - 1))} 
+                disabled={page === 1}
+                style={{ padding: '8px 12px', background: 'transparent', border: 'none', color: page === 1 ? 'rgba(255,255,255,0.2)' : 'var(--text-secondary)', cursor: page === 1 ? 'not-allowed' : 'pointer', fontSize: '1.2rem' }}>
+                &lsaquo;
+            </button>
+            
+            {(() => {
+                let pages = [];
+                if (totalPages <= 7) {
+                    pages = Array.from({ length: totalPages }, (_, i) => i + 1);
+                } else {
+                    if (page <= 4) {
+                        pages = [1, 2, 3, 4, 5, '...', totalPages];
+                    } else if (page >= totalPages - 3) {
+                        pages = [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+                    } else {
+                        pages = [1, '...', page - 1, page, page + 1, '...', totalPages];
+                    }
+                }
+                return pages.map((p, i) => (
+                    <button
+                        key={i}
+                        onClick={() => p !== '...' && setPage(p)}
+                        disabled={p === '...'}
+                        style={{
+                            padding: '8px 16px',
+                            background: p === page ? 'var(--accent-color)' : 'rgba(255,255,255,0.05)',
+                            border: p === page ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                            color: p === page ? 'white' : 'var(--text-secondary)',
+                            borderRadius: '8px',
+                            cursor: p === '...' ? 'default' : 'pointer',
+                            fontWeight: p === page ? 'bold' : 'normal',
+                            transition: 'all 0.2s'
+                        }}
+                    >
+                        {p}
+                    </button>
+                ));
+            })()}
+
+            <button 
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))} 
+                disabled={page === totalPages}
+                style={{ padding: '8px 12px', background: 'transparent', border: 'none', color: page === totalPages ? 'rgba(255,255,255,0.2)' : 'var(--text-secondary)', cursor: page === totalPages ? 'not-allowed' : 'pointer', fontSize: '1.2rem' }}>
+                &rsaquo;
+            </button>
+            <button 
+                onClick={() => setPage(totalPages)} 
+                disabled={page === totalPages}
+                style={{ padding: '8px 12px', background: 'transparent', border: 'none', color: page === totalPages ? 'rgba(255,255,255,0.2)' : 'var(--text-secondary)', cursor: page === totalPages ? 'not-allowed' : 'pointer', fontSize: '1.2rem' }}>
+                &raquo;
+            </button>
+        </div>
+      )}
 
       {selectedItem && (
         <DetailModal item={selectedItem} onClose={() => setSelectedItem(null)} />

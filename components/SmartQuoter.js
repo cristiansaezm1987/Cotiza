@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bot, ShoppingCart, Calculator, Download, CheckCircle, FileText, Activity } from 'lucide-react';
+import { Bot, ShoppingCart, Calculator, Download, CheckCircle, FileText, Activity, ExternalLink, X } from 'lucide-react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
@@ -14,6 +14,7 @@ export default function SmartQuoter({ item, details, aiKeywords, onMarkSubmitted
   
   const [manualSearchQueries, setManualSearchQueries] = useState({});
   const [isManualSearching, setIsManualSearching] = useState({});
+  const [meliPulseModal, setMeliPulseModal] = useState({ isOpen: false, itemIndex: null, query: '', results: [], isSearching: false });
   
   const [error, setError] = useState(null);
 
@@ -27,8 +28,8 @@ export default function SmartQuoter({ item, details, aiKeywords, onMarkSubmitted
     setError(null);
     try {
       const queries = items.map((item, i) => {
-          if (i === 0 && keywordsToUse && keywordsToUse.length > 0) {
-              return keywordsToUse.join(" ");
+          if (keywordsToUse && keywordsToUse[i]) {
+              return keywordsToUse[i];
           }
           return item.nombre;
       });
@@ -67,61 +68,44 @@ export default function SmartQuoter({ item, details, aiKeywords, onMarkSubmitted
       setSelectedMap(prev => ({ ...prev, [index]: prod }));
   };
 
-  const handleManualSearch = async (index) => {
-      const query = manualSearchQueries[index];
-      if (!query) return;
+  const openMeliPulseModal = (index) => {
+      const initialQuery = (aiKeywords && aiKeywords[index]) ? aiKeywords[index] : items[index].nombre;
+      setMeliPulseModal({ isOpen: true, itemIndex: index, query: initialQuery, results: [], isSearching: true });
+      executeMeliPulseSearch(initialQuery);
+  };
 
-      setIsManualSearching(prev => ({ ...prev, [index]: true }));
+  const closeMeliPulseModal = () => {
+      setMeliPulseModal({ isOpen: false, itemIndex: null, query: '', results: [], isSearching: false });
+  };
+
+  const executeMeliPulseSearch = async (query) => {
+      if (!query) return;
+      setMeliPulseModal(prev => ({ ...prev, query, isSearching: true }));
       try {
           const res = await fetch(`/api/mercadolibre?q=${encodeURIComponent(query)}`);
           let data = {};
           try { data = await res.json(); } catch (e) {}
 
           if (res.ok && data.success && data.results) {
-              setMlResultsMap(prev => ({ ...prev, [index]: data.results }));
-              setSelectedMap(prev => { const n = {...prev}; delete n[index]; return n; }); // Clear selection on new search
+              setMeliPulseModal(prev => ({ ...prev, results: data.results, isSearching: false }));
           } else {
-              alert('Error en búsqueda manual: ' + (data.error || 'Respuesta inválida'));
+              setMeliPulseModal(prev => ({ ...prev, results: [], isSearching: false }));
+              alert('Error en MeliPulse: ' + (data.error || 'Respuesta inválida'));
           }
       } catch (e) {
           console.error(e);
-          alert('Error de conexión');
-      } finally {
-          setIsManualSearching(prev => ({ ...prev, [index]: false }));
+          setMeliPulseModal(prev => ({ ...prev, results: [], isSearching: false }));
+          alert('Error de conexión con MeliPulse');
       }
   };
 
-  const handlePasteLink = async (index) => {
-      const link = prompt('Pega aquí el link completo de Mercado Libre:');
-      if (!link || !link.includes('mercadolibre.cl')) {
-          if (link) alert('Por favor, ingresa un enlace válido de Mercado Libre Chile.');
-          return;
+  const selectProductFromModal = (prod) => {
+      const idx = meliPulseModal.itemIndex;
+      selectProduct(idx, prod);
+      if (meliPulseModal.results.length > 0) {
+          setMlResultsMap(prev => ({ ...prev, [idx]: meliPulseModal.results }));
       }
-      
-      // Muestra al usuario que está cargando
-      setIsManualSearching(prev => ({ ...prev, [index]: true }));
-      
-      try {
-          const res = await fetch(`/api/mercadolibre-gemini?url=${encodeURIComponent(link)}`);
-          let data = {};
-          try { data = await res.json(); } catch (e) {}
-
-          if (res.ok && data.success && data.result) {
-              const customProd = data.result;
-              setMlResultsMap(prev => {
-                  const current = prev[index] || [];
-                  return { ...prev, [index]: [customProd, ...current] };
-              });
-              selectProduct(index, customProd);
-          } else {
-              alert('Error procesando enlace: ' + (data.error || 'Respuesta inválida'));
-          }
-      } catch (e) {
-          console.error(e);
-          alert('Error de conexión al procesar el enlace');
-      } finally {
-          setIsManualSearching(prev => ({ ...prev, [index]: false }));
-      }
+      closeMeliPulseModal();
   };
 
   const generateQuote = async () => {
@@ -146,7 +130,13 @@ export default function SmartQuoter({ item, details, aiKeywords, onMarkSubmitted
               let historyVol = 0;
               
               try {
-                  const histRes = await fetch(`/api/market-intelligence?q=${encodeURIComponent(itemName)}&days=3`);
+                  const controller = new AbortController();
+                  const timeoutId = setTimeout(() => controller.abort(), 12000); // 12 segundos máximo
+                  const histRes = await fetch(`/api/market-intelligence?q=${encodeURIComponent(itemName)}&days=3`, {
+                      signal: controller.signal
+                  });
+                  clearTimeout(timeoutId);
+
                   if (histRes.ok) {
                       const histData = await histRes.json();
                       if (histData.success && histData.data && histData.data.length > 0) {
@@ -159,28 +149,32 @@ export default function SmartQuoter({ item, details, aiKeywords, onMarkSubmitted
                                       validPrices++;
                                       if (orderItem.precioNeto > historyMax) historyMax = orderItem.precioNeto;
                                   }
-                                  historyVol += orderItem.cantidad || 0;
                               });
                           });
                           historyAvg = validPrices > 0 ? Math.round(sumPrices / validPrices) : 0;
                       }
                   }
               } catch (histErr) {
-                  console.error("Market intelligence error:", histErr);
+                  console.error("Market intelligence error/timeout:", histErr);
               }
 
               // 2. Cross-reference with Gemini
-              const aiRes = await fetch('/api/intelligence/generate-quote', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                      productName: itemName,
-                      cost: product.price,
-                      historyData: { average: historyAvg, max: historyMax, items: [] }
-                  })
-              });
               let aiData = { success: false };
               try {
+                  const aiController = new AbortController();
+                  const aiTimeout = setTimeout(() => aiController.abort(), 15000); // 15s max
+                  const aiRes = await fetch('/api/intelligence/generate-quote', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                          productName: itemName,
+                          cost: product.price,
+                          historyData: { average: historyAvg, max: historyMax, items: [] }
+                      }),
+                      signal: aiController.signal
+                  });
+                  clearTimeout(aiTimeout);
+                  
                   const aiText = await aiRes.text();
                   try {
                       aiData = JSON.parse(aiText);
@@ -188,7 +182,7 @@ export default function SmartQuoter({ item, details, aiKeywords, onMarkSubmitted
                       console.error("No se pudo parsear JSON de generate-quote", aiText);
                   }
               } catch (e) {
-                  console.error("Error leyendo respuesta de generate-quote", e);
+                  console.error("Error leyendo respuesta de generate-quote (timeout o red)", e);
               }
               
               if (aiData.success && aiData.data) {
@@ -327,30 +321,23 @@ export default function SmartQuoter({ item, details, aiKeywords, onMarkSubmitted
             <div key={index} style={{ marginBottom: '25px', padding: '15px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', borderLeft: '4px solid #3b82f6' }}>
               <h4 style={{ color: 'white', marginBottom: '15px', fontSize: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>Ítem {index + 1}: {itemObj.nombre} <span style={{ color: '#9ca3af', fontSize: '0.8rem' }}>(Cant: {itemObj.cantidad})</span></span>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                    <button 
-                        onClick={() => handlePasteLink(index)}
-                        style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid rgba(16, 185, 129, 0.4)', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}
-                        title="Pegar un enlace directo de Mercado Libre"
-                    >
-                        + Pegar Link
-                    </button>
-                    <input 
-                        type="text" 
-                        placeholder="Buscar distinto..." 
-                        value={manualSearchQueries[index] || ''}
-                        onChange={(e) => setManualSearchQueries(prev => ({ ...prev, [index]: e.target.value }))}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleManualSearch(index); }}
-                        style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.2)', color: 'white', fontSize: '0.8rem' }}
-                    />
-                    <button 
-                        onClick={() => handleManualSearch(index)}
-                        disabled={isManualSearching[index]}
-                        style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: '#3b82f6', color: 'white', fontSize: '0.8rem', cursor: 'pointer', opacity: isManualSearching[index] ? 0.6 : 1 }}
-                    >
-                        {isManualSearching[index] ? '...' : 'Buscar'}
-                    </button>
-                </div>
+                {aiKeywords && aiKeywords[index] && (
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        <button 
+                            onClick={() => openMeliPulseModal(index)}
+                            style={{ 
+                                display: 'flex', alignItems: 'center', gap: '6px', 
+                                padding: '6px 12px', borderRadius: '6px', border: 'none', cursor: 'pointer',
+                                background: 'linear-gradient(90deg, #ffe600, #ffb000)', 
+                                color: '#2d3277', fontWeight: 'bold', textDecoration: 'none',
+                                boxShadow: '0 2px 5px rgba(0,0,0,0.2)', fontSize: '0.8rem'
+                            }}
+                            title={`Búsqueda Inteligente: ${aiKeywords[index]}`}
+                        >
+                            <ShoppingCart size={14} /> MeliPulse: Buscar Alternativas
+                        </button>
+                    </div>
+                )}
               </h4>
               <div style={{ maxHeight: '380px', overflowY: 'auto', paddingRight: '8px' }} className="custom-scrollbar">
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '10px' }}>
@@ -406,6 +393,64 @@ export default function SmartQuoter({ item, details, aiKeywords, onMarkSubmitted
                   <Calculator size={20} /> Generar Cotización Matemática Completa
                 </button>
             </div>
+          )}
+
+          {/* MeliPulse Search Modal */}
+          {meliPulseModal.isOpen && (
+              <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.8)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ background: 'var(--bg-dark)', width: '90%', maxWidth: '900px', maxHeight: '85vh', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                      <div style={{ padding: '15px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255, 176, 0, 0.1)' }}>
+                          <h3 style={{ margin: 0, color: '#ffb000', display: 'flex', alignItems: 'center', gap: '8px' }}><ShoppingCart size={20} /> MeliPulse: Búsqueda Manual</h3>
+                          <button onClick={closeMeliPulseModal} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={24} /></button>
+                      </div>
+                      <div style={{ padding: '20px', display: 'flex', gap: '10px' }}>
+                          <input 
+                              type="text" 
+                              value={meliPulseModal.query}
+                              onChange={(e) => setMeliPulseModal(prev => ({ ...prev, query: e.target.value }))}
+                              onKeyDown={(e) => { if (e.key === 'Enter') executeMeliPulseSearch(meliPulseModal.query); }}
+                              style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'rgba(0,0,0,0.2)', color: 'white', fontSize: '1rem' }}
+                              placeholder="Buscar producto en MeliPulse..."
+                          />
+                          <button 
+                              onClick={() => executeMeliPulseSearch(meliPulseModal.query)}
+                              disabled={meliPulseModal.isSearching}
+                              style={{ padding: '0 20px', borderRadius: '8px', border: 'none', background: '#3b82f6', color: 'white', fontWeight: 'bold', cursor: 'pointer', opacity: meliPulseModal.isSearching ? 0.7 : 1 }}
+                          >
+                              {meliPulseModal.isSearching ? 'Buscando...' : 'Buscar'}
+                          </button>
+                      </div>
+                      <div style={{ padding: '0 20px 20px 20px', flex: 1, overflowY: 'auto' }} className="custom-scrollbar">
+                          {meliPulseModal.isSearching ? (
+                              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                                  <div style={{ width: '40px', height: '40px', border: '4px solid rgba(255,176,0,0.3)', borderTopColor: '#ffb000', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 20px auto' }}></div>
+                                  Buscando las mejores alternativas...
+                              </div>
+                          ) : (
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '15px' }}>
+                                  {meliPulseModal.results.map((res, i) => (
+                                      <div key={i} style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '8px', padding: '15px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column' }}>
+                                          <div style={{ height: '140px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '10px', background: 'white', borderRadius: '6px', padding: '10px' }}>
+                                              <img src={res.thumbnail} alt="img" style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }} />
+                                          </div>
+                                          <h5 style={{ color: 'white', fontSize: '0.9rem', marginBottom: '10px', flex: 1, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{res.title}</h5>
+                                          <p style={{ color: '#10b981', fontSize: '1.2rem', fontWeight: 700, margin: '0 0 15px 0' }}>${Number(res.price).toLocaleString('es-CL')}</p>
+                                          <button 
+                                              onClick={() => selectProductFromModal(res)}
+                                              style={{ width: '100%', padding: '10px', borderRadius: '6px', border: 'none', background: 'var(--primary-color)', color: 'white', fontWeight: 600, cursor: 'pointer' }}
+                                          >
+                                              Seleccionar
+                                          </button>
+                                      </div>
+                                  ))}
+                                  {meliPulseModal.results.length === 0 && !meliPulseModal.isSearching && (
+                                      <p style={{ gridColumn: '1 / -1', textAlign: 'center', color: 'var(--text-muted)', padding: '20px' }}>No se encontraron resultados para esta búsqueda.</p>
+                                  )}
+                              </div>
+                          )}
+                      </div>
+                  </div>
+              </div>
           )}
         </div>
       )}

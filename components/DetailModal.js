@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Package, MapPin, Building2, Calendar, FileText, Paperclip, Download, Calculator } from 'lucide-react';
+import { X, Calendar, FileText, Download, DollarSign, Package, Building2, AlertCircle, Paperclip, Activity, MapPin, Calculator, ShoppingCart } from 'lucide-react';
 import SmartQuoter from './SmartQuoter';
 
 export default function DetailModal({ item, onClose, onMarkSubmitted }) {
@@ -25,7 +25,7 @@ export default function DetailModal({ item, onClose, onMarkSubmitted }) {
       try {
           let fullText = details.descripcion || '';
           if (details.productos_solicitados) {
-              fullText += " Productos: " + details.productos_solicitados.map(p => `${p.nombre} ${p.descripcion}`).join(", ");
+              fullText += `\n\nÍTEMS SOLICITADOS (Debe retornar exactamente ${details.productos_solicitados.length} strings de búsqueda en el arreglo 'keywords'):\n` + details.productos_solicitados.map((p, i) => `Ítem ${i+1}: ${p.nombre} - ${p.descripcion}`).join("\n");
           }
 
           let pdfs = [];
@@ -92,7 +92,7 @@ export default function DetailModal({ item, onClose, onMarkSubmitted }) {
               setIsAnalyzing(true);
               let fullText = details.descripcion || '';
               if (details.productos_solicitados) {
-                  fullText += " Productos: " + details.productos_solicitados.map(p => `${p.nombre} ${p.descripcion}`).join(", ");
+                  fullText += `\n\nÍTEMS SOLICITADOS (Debe retornar exactamente ${details.productos_solicitados.length} strings de búsqueda en el arreglo 'keywords'):\n` + details.productos_solicitados.map((p, i) => `Ítem ${i+1}: ${p.nombre} - ${p.descripcion}`).join("\n");
               }
               const res = await fetch('/api/intelligence/read-text', {
                   method: 'POST',
@@ -309,6 +309,26 @@ export default function DetailModal({ item, onClose, onMarkSubmitted }) {
                         <span style={{ fontWeight: 600, color: 'var(--accent-color)' }}>Cant: {prod.cantidad} {prod.unidad_medida}</span>
                       </div>
                       <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{prod.descripcion}</p>
+                      
+                      {aiAnalysis && aiAnalysis.keywords && aiAnalysis.keywords[idx] && (
+                          <div className="animate-fade-in" style={{ marginTop: '12px', display: 'flex', justifyContent: 'flex-start' }}>
+                              <a 
+                                  href={`https://listado.mercadolibre.cl/${encodeURIComponent(aiAnalysis.keywords[idx].replace(/\s+/g, '-'))}`} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  style={{ 
+                                      display: 'flex', alignItems: 'center', gap: '8px', 
+                                      padding: '8px 16px', borderRadius: '6px', 
+                                      background: 'linear-gradient(90deg, #ffe600, #ffb000)', 
+                                      color: '#2d3277', fontWeight: 'bold', textDecoration: 'none',
+                                      boxShadow: '0 2px 5px rgba(0,0,0,0.2)', fontSize: '0.9rem'
+                                  }}
+                                  title={`Búsqueda Inteligente: ${aiAnalysis.keywords[idx]}`}
+                              >
+                                  <ShoppingCart size={16} /> MeliPulse: Ver opciones (Filtros, Envío Full)
+                              </a>
+                          </div>
+                      )}
                     </div>
                   ))}
                 </div>

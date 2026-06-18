@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, Zap, List, BookOpen, CheckCircle } from 'lucide-react';
+import { Play, Pause, Zap, List, BookOpen, CheckCircle, Activity, Download } from 'lucide-react';
 import Filters from './Filters';
 import DataTable from './DataTable';
 import RefreshButton from './RefreshButton';
@@ -28,6 +28,83 @@ export default function Dashboard() {
   const [excelData, setExcelData] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [isRefreshingExcel, setIsRefreshingExcel] = useState(false);
+
+  const [syncStatus, setSyncStatus] = useState({
+    incremental: { active: false, progress: 0, message: '' },
+    full: { active: false, progress: 0, message: '' },
+    excel: { active: false, progress: 0, message: '' }
+  });
+
+  const [dbStats, setDbStats] = useState({ totalCount: 0, lastSync: null });
+
+  useEffect(() => {
+    let tick = 0;
+    const checkStatus = async () => {
+      try {
+        const res = await fetch('/api/sync/status', { cache: 'no-store' });
+        const json = await res.json();
+        if (json.success) {
+          setSyncStatus(prev => {
+              // If sync just finished, trigger a fetch
+              if (prev.full.active && !json.data.full.active) {
+                  setTimeout(() => window.dispatchEvent(new Event('syncFinished')), 500);
+              }
+              if (prev.incremental.active && !json.data.incremental.active) {
+                  setTimeout(() => window.dispatchEvent(new Event('syncFinished')), 500);
+              }
+              return json.data;
+          });
+        }
+        
+        // Fetch stats every 3 seconds to avoid spamming the DB too much, or 1s if we want. Let's do 3s.
+        if (tick % 3 === 0) {
+            const statsRes = await fetch('/api/stats', { cache: 'no-store' });
+            const statsJson = await statsRes.json();
+            if (statsJson.success) {
+               setDbStats(statsJson.data);
+            }
+        }
+        tick++;
+      } catch (e) {}
+    };
+    const interval = setInterval(checkStatus, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Listen to syncFinished event to auto-refresh data
+  useEffect(() => {
+      const handleSyncFinished = () => {
+          setPage(1);
+          // Only fetch DB data, not excel unless needed
+          if (typeof window !== 'undefined') {
+              // find fetchData somehow... wait, we can just trigger handleRefreshAll, but we don't have it here.
+              // We'll define a global event listener later in the component.
+          }
+      };
+      window.addEventListener('syncFinished', handleSyncFinished);
+      return () => window.removeEventListener('syncFinished', handleSyncFinished);
+  }, []);
+
+  // Also auto-refresh every 30 seconds if a sync is active so user sees progress
+  useEffect(() => {
+      let interval;
+      if (syncStatus.full.active || syncStatus.incremental.active) {
+          interval = setInterval(() => {
+              window.dispatchEvent(new Event('syncFinished'));
+          }, 30000);
+      }
+      return () => {
+          if (interval) clearInterval(interval);
+      };
+  }, [syncStatus.full.active, syncStatus.incremental.active]);
+
+  // Sync Automática cada 1 Hora
+  useEffect(() => {
+    const autoSyncInterval = setInterval(() => {
+      fetch('/api/sync/incremental').catch(e => console.error('Auto sync error:', e));
+    }, 60 * 60 * 1000); // 1 hora
+    return () => clearInterval(autoSyncInterval);
+  }, []);
 
   // Background Vetting State
   const [vettedData, setVettedData] = useState([]);
@@ -123,8 +200,8 @@ export default function Dashboard() {
           isVettingRef.current = false;
       };
       
-      const interval = setInterval(processVettingQueue, 2000);
-      return () => clearInterval(interval);
+      const queueInterval = setInterval(processVettingQueue, 2000);
+      return () => clearInterval(queueInterval);
   }, []);
 
   const fetchAllRemainingPages = async (startPage, totalPages, accumulatedData) => {
@@ -245,6 +322,15 @@ export default function Dashboard() {
       if (result.success && result.data) {
         setExcelData(result.data);
         setLastUpdate(new Date().toLocaleString('es-CL'));
+        
+        result.data.forEach(item => {
+            if (!processedIdsRef.current.has(item.id)) {
+                processedIdsRef.current.add(item.id);
+                const scoredItem = calculateBiScore(item);
+                if (scoredItem.biScore >= 0) vettingQueueRef.current.push(scoredItem);
+            }
+        });
+        vettingQueueRef.current.sort((a,b) => b.biScore - a.biScore);
       }
     } catch (err) {
       console.error('Error syncing Excel data:', err);
@@ -260,6 +346,14 @@ export default function Dashboard() {
       syncExcelData();
     }
   };
+
+  useEffect(() => {
+      const handleSyncRefresh = () => {
+          fetchData();
+      };
+      window.addEventListener('syncFinished', handleSyncRefresh);
+      return () => window.removeEventListener('syncFinished', handleSyncRefresh);
+  }, [fetchData]);
 
   useEffect(() => {
     if (!syncRef.current) {
@@ -373,15 +467,26 @@ export default function Dashboard() {
               <List size={18} /> Explorador General
           </button>
           <button
-              onClick={() => setActiveTab('suggested')}
+              onClick={() => setActiveTab('suggested-1')}
               style={{
                   padding: '12px 24px', borderRadius: '8px', border: 'none', cursor: 'pointer',
                   display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', transition: '0.2s',
-                  background: activeTab === 'suggested' ? '#8b5cf6' : 'rgba(255,255,255,0.05)',
-                  color: activeTab === 'suggested' ? 'white' : 'var(--text-secondary)'
+                  background: activeTab === 'suggested-1' ? '#8b5cf6' : 'rgba(255,255,255,0.05)',
+                  color: activeTab === 'suggested-1' ? 'white' : 'var(--text-secondary)'
               }}
           >
-              <Zap size={18} /> Licitaciones Sugeridas
+              <Zap size={18} /> Sugeridas (1er Llamado)
+          </button>
+          <button
+              onClick={() => setActiveTab('suggested-2')}
+              style={{
+                  padding: '12px 24px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', transition: '0.2s',
+                  background: activeTab === 'suggested-2' ? '#d946ef' : 'rgba(255,255,255,0.05)',
+                  color: activeTab === 'suggested-2' ? 'white' : 'var(--text-secondary)'
+              }}
+          >
+              <Activity size={18} /> Sugeridas (2do Llamado)
           </button>
           <button
               onClick={() => setActiveTab('intelligence')}
@@ -406,39 +511,111 @@ export default function Dashboard() {
               <CheckCircle size={18} /> Licitaciones Postuladas
           </button>
       </div>
+      
+      {/* Database Sync Controls */}
+      <div className="glass-panel animate-fade-in" style={{ padding: '15px 20px', display: 'flex', flexDirection: 'column', gap: '15px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid var(--accent-color)' }}>
+         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+             <div>
+                 <h4 style={{ margin: '0 0 5px 0', color: 'white', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                     <Activity size={18} color="var(--accent-color)" /> Sincronización y Base de Datos
+                 </h4>
+                 <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                     Panel de control para descargas en segundo plano. No bloquean la pantalla.
+                 </p>
+             </div>
+             
+             <div style={{ display: 'flex', gap: '10px' }}>
+                 <button 
+                     onClick={async () => { fetch('/api/sync/incremental'); }}
+                     disabled={syncStatus.incremental.active}
+                     style={{ 
+                         background: 'rgba(59, 130, 246, 0.2)', border: '1px solid #3b82f6', color: '#3b82f6', 
+                         padding: '6px 12px', borderRadius: '6px', cursor: syncStatus.incremental.active ? 'not-allowed' : 'pointer',
+                         fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem'
+                     }}
+                 >
+                     <Zap size={14} /> Sync Rápida (1 hr)
+                 </button>
+                 
+                 <button 
+                     onClick={async () => {
+                         if(!confirm('Esto descargará histórico. ¿Continuar?')) return;
+                         fetch('/api/sync/full');
+                     }}
+                     disabled={syncStatus.full.active}
+                     style={{ 
+                         background: 'var(--accent-color)', border: 'none', color: 'white', 
+                         padding: '6px 12px', borderRadius: '6px', cursor: syncStatus.full.active ? 'not-allowed' : 'pointer',
+                         fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem'
+                     }}
+                 >
+                     <Download size={14} /> Sync Completa
+                 </button>
+
+                 <button 
+                     onClick={async () => { fetch('/api/excel'); }}
+                     disabled={syncStatus.excel.active}
+                     style={{ 
+                         background: '#10b981', border: 'none', color: 'white', 
+                         padding: '6px 12px', borderRadius: '6px', cursor: syncStatus.excel.active ? 'not-allowed' : 'pointer',
+                         fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem'
+                     }}
+                 >
+                     <List size={14} /> Descargar Excel
+                 </button>
+             </div>
+         </div>
+
+         {/* Progress Bars & Status Panel */}
+         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {/* Sync Rápida / Principal */}
+            <div style={{ background: 'rgba(0,0,0,0.2)', padding: '10px 14px', borderRadius: '8px', borderLeft: '4px solid #3b82f6' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#60a5fa', marginBottom: '4px', fontWeight: 'bold' }}>
+                    <span>Estado: Base Local (SQLite)</span>
+                    <span>{dbStats.totalCount !== undefined && dbStats.totalCount !== null ? `${dbStats.totalCount} licitaciones guardadas` : 'Consultando...'}</span>
+                </div>
+                {syncStatus.incremental.active || syncStatus.full.active ? (
+                    <>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                            <span>{syncStatus.full.active ? syncStatus.full.message : syncStatus.incremental.message}</span>
+                            <span>{Math.round(syncStatus.full.active ? syncStatus.full.progress : syncStatus.incremental.progress)}%</span>
+                        </div>
+                        <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
+                            <div style={{ height: '100%', background: syncStatus.full.active ? 'var(--accent-color)' : '#3b82f6', width: `${syncStatus.full.active ? syncStatus.full.progress : syncStatus.incremental.progress}%`, transition: 'width 0.3s' }} />
+                        </div>
+                    </>
+                ) : (
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                        Inactivo. Última sincronización registrada: {dbStats.lastSync ? new Date(dbStats.lastSync).toLocaleString('es-CL') : 'Desconocida'}
+                    </div>
+                )}
+            </div>
+
+            {/* Excel / Segundos Llamados */}
+            <div style={{ background: 'rgba(0,0,0,0.2)', padding: '10px 14px', borderRadius: '8px', borderLeft: '4px solid #10b981' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#10b981', marginBottom: '4px', fontWeight: 'bold' }}>
+                    <span>Estado: Base Excel (Segundos Llamados)</span>
+                    <span>{excelData ? `${excelData.length} registros en memoria` : 'No descargado en esta sesión'}</span>
+                </div>
+                {syncStatus.excel.active ? (
+                    <>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                            <span>{syncStatus.excel.message}</span>
+                            <span>{Math.round(syncStatus.excel.progress)}%</span>
+                        </div>
+                        <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
+                            <div style={{ height: '100%', background: '#10b981', width: `${syncStatus.excel.progress}%`, transition: 'width 0.3s' }} />
+                        </div>
+                    </>
+                ) : (
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                        {excelData ? 'Excel procesado con éxito.' : 'Presiona "Descargar Excel" para traer los segundos llamados del día.'}
+                    </div>
+                )}
+            </div>
+         </div>
+      </div>
   
-      {isBackgroundLoading && (
-        <div className="glass-panel animate-fade-in" style={{ padding: '15px 20px', display: 'flex', alignItems: 'center', gap: '15px', background: isSyncPaused ? 'rgba(245, 158, 11, 0.1)' : 'rgba(59, 130, 246, 0.1)', border: `1px solid ${isSyncPaused ? '#f59e0b' : 'var(--accent-color)'}` }}>
-          {!isSyncPaused && <div style={{ width: '20px', height: '20px', border: '2px solid rgba(255,255,255,0.2)', borderTopColor: 'var(--accent-color)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>}
-          {isSyncPaused && <div style={{ width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Pause size={18} color="#f59e0b" /></div>}
-          
-          <div style={{ flex: 1 }}>
-             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                 <span style={{ fontSize: '0.9rem', color: isSyncPaused ? '#f59e0b' : 'var(--accent-color)', fontWeight: 'bold' }}>
-                    {isSyncPaused ? 'Sincronización Profunda Pausada' : 'Sincronización Profunda en Progreso...'}
-                 </span>
-                 <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Página {backgroundProgress.current} de {backgroundProgress.total} ({backgroundProgress.total > 0 ? Math.round((backgroundProgress.current / backgroundProgress.total) * 100) : 0}%)</span>
-             </div>
-             <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
-                 <div style={{ width: `${(backgroundProgress.current / backgroundProgress.total) * 100}%`, height: '100%', background: isSyncPaused ? '#f59e0b' : 'var(--accent-color)', transition: 'width 0.3s' }}></div>
-             </div>
-          </div>
-
-          <button 
-             onClick={() => setIsSyncPaused(!isSyncPaused)}
-             style={{ 
-                 background: isSyncPaused ? '#10b981' : 'rgba(255,255,255,0.1)', 
-                 border: 'none', borderRadius: '50%', width: '36px', height: '36px', 
-                 display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-                 color: 'white', transition: '0.2s'
-             }}
-             title={isSyncPaused ? "Reanudar" : "Pausar"}
-          >
-             {isSyncPaused ? <Play size={18} fill="currentColor" /> : <Pause size={18} fill="currentColor" />}
-          </button>
-        </div>
-      )}
-
       {isRefreshingExcel && (
         <div className="glass-panel" style={{ padding: '20px', textAlign: 'center', background: 'rgba(0, 198, 255, 0.1)', border: '1px solid var(--accent-color)' }}>
           <h3 style={{ color: 'var(--accent-color)', marginBottom: '10px' }}>Bypass en progreso: Descargando datos ocultos...</h3>
@@ -469,40 +646,86 @@ export default function Dashboard() {
                      <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
                          {totalCount > 0 ? `Mostrando ${filteredData.length} resultados en esta página (Total en sistema: ${totalCount})` : 'No se encontraron resultados.'}
                      </span>
-                     <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                     <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
+                         <button 
+                            onClick={() => setPage(1)} 
+                            disabled={page === 1 || isLoading}
+                            style={{ padding: '8px 12px', background: 'transparent', border: 'none', color: (page === 1 || isLoading) ? 'rgba(255,255,255,0.2)' : 'var(--text-secondary)', cursor: (page === 1 || isLoading) ? 'not-allowed' : 'pointer', fontSize: '1.2rem' }}>
+                             &laquo;
+                         </button>
                          <button 
                             onClick={handlePrevPage} 
                             disabled={page === 1 || isLoading}
-                            style={{
-                                padding: '8px 16px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-                                color: 'white', borderRadius: '8px', cursor: (page === 1 || isLoading) ? 'not-allowed' : 'pointer', opacity: (page === 1 || isLoading) ? 0.5 : 1
-                            }}>
-                             Anterior
+                            style={{ padding: '8px 12px', background: 'transparent', border: 'none', color: (page === 1 || isLoading) ? 'rgba(255,255,255,0.2)' : 'var(--text-secondary)', cursor: (page === 1 || isLoading) ? 'not-allowed' : 'pointer', fontSize: '1.2rem' }}>
+                             &lsaquo;
                          </button>
-                         <span style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.1)', borderRadius: '8px', color: 'var(--accent-color)', fontWeight: 'bold', minWidth: '100px', textAlign: 'center' }}>
-                            Página {page}
-                         </span>
+                         
+                         {(() => {
+                              const total = Math.max(1, Math.ceil(totalCount / 20));
+                              let pages = [];
+                              if (total <= 7) {
+                                  pages = Array.from({ length: total }, (_, i) => i + 1);
+                              } else if (page <= 4) {
+                                  pages = [1, 2, 3, 4, 5, '...', total];
+                              } else if (page >= total - 3) {
+                                  pages = [1, '...', total - 4, total - 3, total - 2, total - 1, total];
+                              } else {
+                                  pages = [1, '...', page - 1, page, page + 1, '...', total];
+                              }
+                              
+                              return pages.map((p, idx) => (
+                                  p === '...' ? (
+                                      <span key={`ellipsis-${idx}`} style={{ color: 'var(--text-secondary)', padding: '0 5px' }}>...</span>
+                                  ) : (
+                                      <button
+                                          key={p}
+                                          onClick={() => setPage(p)}
+                                          style={{
+                                              padding: '6px 12px',
+                                              background: p === page ? '#2563eb' : 'transparent',
+                                              color: p === page ? 'white' : '#60a5fa',
+                                              border: 'none',
+                                              borderRadius: '6px',
+                                              cursor: 'pointer',
+                                              fontWeight: p === page ? 'bold' : 'normal',
+                                              fontSize: '0.95rem'
+                                          }}
+                                      >
+                                          {p}
+                                      </button>
+                                  )
+                              ));
+                         })()}
+
                          <button 
                             onClick={handleNextPage} 
-                            disabled={page * 15 >= totalCount}
-                            style={{
-                                padding: '8px 16px', background: 'var(--primary-color)', border: 'none',
-                                color: 'white', borderRadius: '8px', cursor: (page * 15 >= totalCount) ? 'not-allowed' : 'pointer', opacity: (page * 15 >= totalCount) ? 0.5 : 1
-                            }}>
-                             Siguiente
+                            disabled={page * 20 >= totalCount}
+                            style={{ padding: '8px 12px', background: 'transparent', border: 'none', color: (page * 20 >= totalCount) ? 'rgba(255,255,255,0.2)' : 'var(--text-secondary)', cursor: (page * 20 >= totalCount) ? 'not-allowed' : 'pointer', fontSize: '1.2rem' }}>
+                             &rsaquo;
+                         </button>
+                         <button 
+                            onClick={() => setPage(Math.max(1, Math.ceil(totalCount / 20)))} 
+                            disabled={page * 20 >= totalCount}
+                            style={{ padding: '8px 12px', background: 'transparent', border: 'none', color: (page * 20 >= totalCount) ? 'rgba(255,255,255,0.2)' : 'var(--text-secondary)', cursor: (page * 20 >= totalCount) ? 'not-allowed' : 'pointer', fontSize: '1.2rem' }}>
+                             &raquo;
                          </button>
                      </div>
               </div>
           </>
       )}
 
-      {activeTab === 'suggested' && (
+      {(activeTab === 'suggested-1' || activeTab === 'suggested-2') && (
           <>
               <div style={{ marginBottom: '15px' }}>
                  <Filters filters={filters} setFilters={setFilters} />
               </div>
               <Top20View 
-                 data={vettedData.filter(item => !submittedBids[item.id])} 
+                 data={vettedData.filter(item => {
+                     if (submittedBids[item.id]) return false;
+                     if (activeTab === 'suggested-1' && item.callNumber === 2) return false;
+                     if (activeTab === 'suggested-2' && item.callNumber !== 2) return false;
+                     return true;
+                 })} 
                  filters={filters} 
               />
           </>

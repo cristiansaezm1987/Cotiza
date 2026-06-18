@@ -5,6 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import * as XLSX from 'xlsx';
 import os from 'os';
+import { updateStatus } from '@/lib/status';
 
 puppeteer.use(StealthPlugin());
 
@@ -13,6 +14,7 @@ export async function GET(req) {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'excel-download-'));
   
   try {
+    updateStatus('excel', { active: true, progress: 0, message: 'Iniciando navegador para Excel...' });
     browser = await puppeteer.launch({
       headless: 'new',
       args: ['--no-sandbox', '--disable-setuid-sandbox']
@@ -42,6 +44,7 @@ export async function GET(req) {
       setTimeout(() => reject(new Error('Download timeout')), 45000); // 45s timeout
     });
 
+    updateStatus('excel', { progress: 20, message: 'Navegando y solicitando Excel...' });
     await page.goto('https://buscador.mercadopublico.cl/compra-agil', { waitUntil: 'networkidle2' });
     
     await page.evaluate(() => {
@@ -51,6 +54,7 @@ export async function GET(req) {
     });
 
     await downloadPromise;
+    updateStatus('excel', { progress: 60, message: 'Archivo descargado, procesando datos...' });
     
     // Find the downloaded file
     const files = fs.readdirSync(tempDir);
@@ -88,7 +92,9 @@ export async function GET(req) {
     }
 
     const headers = rawRows[headerRowIndex];
+    console.log("EXCEL HEADERS FOUND:", headers);
     const dataRows = rawRows.slice(headerRowIndex + 1);
+    console.log("FIRST DATA ROW:", dataRows[0]);
 
     const transformedData = dataRows.map(row => {
       const getVal = (possibleNames) => {
@@ -101,19 +107,17 @@ export async function GET(req) {
         return '';
       };
 
-      let callNum = 1;
-      const estadoConvocatoria = getVal(['Estado Convocatoria', 'Llamado']).toString().toLowerCase();
-      if (estadoConvocatoria.includes('segundo') || estadoConvocatoria.includes('2')) {
-          callNum = 2;
-      }
-
       const montoRaw = getVal(['Monto Disponible', 'Monto', 'Monto Estimado']);
       const montoLimpio = typeof montoRaw === 'string' ? montoRaw.replace(/[^0-9]/g, '') : montoRaw;
 
+      const callNumStr = getVal(['Llamado', 'Nro Llamado', 'Nro', 'Estado Convocatoria']);
+      const strLower = callNumStr ? callNumStr.toString().toLowerCase() : '';
+      const callNum = (strLower.includes('2') || strLower.includes('segundo')) ? 2 : 1;
+      
       return {
-        id: getVal(['ID', 'Código', 'Codigo']),
-        name: getVal(['Nombre', 'Nombre Licitación']),
-        date: getVal(['Fecha de Publicación', 'Fecha Publicación', 'Fecha Publicacion', 'Publicacion']),
+        id: getVal(['ID', 'Codigo Licitacion', 'Codigo', 'Número']),
+        name: getVal(['Nombre', 'Descripción', 'Nombre Licitación']),
+        date: getVal(['Fecha de Publicación', 'Fecha Publicación', 'Fecha Publicacion', 'Publicacion', 'Fecha de Publicacin']),
         closeDate: getVal(['Fecha de cierre', 'Fecha Cierre', 'Cierre']),
         organization: getVal(['Organismo', 'Institución', 'Comprador']),
         region: getVal(['Región', 'Region', 'Unidad']) || 'No especificada',
@@ -126,10 +130,12 @@ export async function GET(req) {
       };
     }).filter(item => item.id);
 
+    updateStatus('excel', { active: false, progress: 100, message: 'Descarga de Excel completada.' });
     return NextResponse.json({ success: true, data: transformedData });
 
   } catch (error) {
     console.error('Excel Download Error:', error);
+    updateStatus('excel', { active: false, progress: 0, message: 'Error en la descarga.' });
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   } finally {
     if (browser) await browser.close();
