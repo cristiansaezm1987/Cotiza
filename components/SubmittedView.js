@@ -1,0 +1,188 @@
+import React, { useState } from 'react';
+import { Package, Truck, Percent, Calculator, ExternalLink, TrendingUp, CheckCircle, XCircle, Clock } from 'lucide-react';
+
+export default function SubmittedView({ submittedBids, onStatusChange }) {
+    const [selectedItem, setSelectedItem] = useState(null);
+
+    // Calculate stats
+    const stats = {
+        total: submittedBids.length,
+        won: submittedBids.filter(b => b.bidStatus === 'ganada').length,
+        lost: submittedBids.filter(b => b.bidStatus === 'perdida').length,
+        pending: submittedBids.filter(b => b.bidStatus === 'postulada').length,
+        totalValue: submittedBids.reduce((acc, b) => acc + (b.biddedPrice || 0), 0),
+        wonValue: submittedBids.filter(b => b.bidStatus === 'ganada').reduce((acc, b) => acc + (b.biddedPrice || 0), 0)
+    };
+
+    const handleStatusChange = (tender, newStatus) => {
+        if (onStatusChange) {
+            onStatusChange(tender, newStatus);
+        }
+    };
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.5s ease-in-out' }}>
+            {/* Mini Dashboard */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
+                <div className="glass-panel" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '15px' }}>
+                    <div style={{ background: 'rgba(59, 130, 246, 0.2)', padding: '15px', borderRadius: '50%', color: '#3b82f6' }}>
+                        <Clock size={28} />
+                    </div>
+                    <div>
+                        <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Postuladas (Espera)</p>
+                        <h3 style={{ margin: '5px 0 0 0', fontSize: '1.5rem' }}>{stats.pending}</h3>
+                    </div>
+                </div>
+                <div className="glass-panel" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '15px' }}>
+                    <div style={{ background: 'rgba(16, 185, 129, 0.2)', padding: '15px', borderRadius: '50%', color: '#10b981' }}>
+                        <CheckCircle size={28} />
+                    </div>
+                    <div>
+                        <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Ganadas</p>
+                        <h3 style={{ margin: '5px 0 0 0', fontSize: '1.5rem', color: '#10b981' }}>{stats.won}</h3>
+                        <span style={{ fontSize: '0.8rem', color: '#10b981' }}>
+                            ${stats.wonValue.toLocaleString('es-CL')}
+                        </span>
+                    </div>
+                </div>
+                <div className="glass-panel" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '15px' }}>
+                    <div style={{ background: 'rgba(239, 68, 68, 0.2)', padding: '15px', borderRadius: '50%', color: '#ef4444' }}>
+                        <XCircle size={28} />
+                    </div>
+                    <div>
+                        <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Perdidas</p>
+                        <h3 style={{ margin: '5px 0 0 0', fontSize: '1.5rem', color: '#ef4444' }}>{stats.lost}</h3>
+                    </div>
+                </div>
+                <div className="glass-panel" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '15px' }}>
+                    <div style={{ background: 'rgba(139, 92, 246, 0.2)', padding: '15px', borderRadius: '50%', color: '#8b5cf6' }}>
+                        <TrendingUp size={28} />
+                    </div>
+                    <div>
+                        <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Monto Total Cotizado</p>
+                        <h3 style={{ margin: '5px 0 0 0', fontSize: '1.5rem', color: '#8b5cf6' }}>
+                            ${stats.totalValue.toLocaleString('es-CL')}
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            {/* Lista de Licitaciones */}
+            <div className="glass-panel" style={{ padding: '20px' }}>
+                <h3 style={{ marginTop: 0, color: 'white', marginBottom: '20px' }}>Detalle de Licitaciones</h3>
+                {submittedBids.length === 0 ? (
+                    <p style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '40px' }}>No tienes licitaciones postuladas aún.</p>
+                ) : (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                        <thead>
+                            <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                                <th style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>ID Licitación</th>
+                                <th style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>Fecha</th>
+                                <th style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>Monto Cotizado</th>
+                                <th style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>Margen</th>
+                                <th style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>Estado</th>
+                                <th style={{ padding: '15px 10px', color: 'var(--text-secondary)', textAlign: 'right' }}>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {submittedBids.map((bid) => (
+                                <tr key={bid.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', transition: '0.2s', background: selectedItem?.id === bid.id ? 'rgba(255,255,255,0.05)' : 'transparent' }}>
+                                    <td style={{ padding: '15px 10px', color: '#60a5fa', fontWeight: 'bold' }}>{bid.id}</td>
+                                    <td style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>{bid.biddedDate || 'N/A'}</td>
+                                    <td style={{ padding: '15px 10px', color: '#10b981', fontWeight: 'bold' }}>
+                                        ${(bid.biddedPrice || 0).toLocaleString('es-CL')}
+                                    </td>
+                                    <td style={{ padding: '15px 10px', color: '#8b5cf6' }}>{bid.biddedMargin || 0}%</td>
+                                    <td style={{ padding: '15px 10px' }}>
+                                        <select 
+                                            value={bid.bidStatus || 'postulada'} 
+                                            onChange={(e) => handleStatusChange(bid, e.target.value)}
+                                            style={{ 
+                                                background: bid.bidStatus === 'ganada' ? 'rgba(16, 185, 129, 0.2)' : 
+                                                            bid.bidStatus === 'perdida' ? 'rgba(239, 68, 68, 0.2)' : 
+                                                            'rgba(59, 130, 246, 0.2)', 
+                                                color: bid.bidStatus === 'ganada' ? '#10b981' : 
+                                                       bid.bidStatus === 'perdida' ? '#ef4444' : 
+                                                       '#3b82f6',
+                                                border: 'none', padding: '5px 10px', borderRadius: '5px', outline: 'none', cursor: 'pointer', fontWeight: 'bold'
+                                            }}
+                                        >
+                                            <option value="postulada">En Espera</option>
+                                            <option value="ganada">Ganada</option>
+                                            <option value="perdida">Perdida</option>
+                                        </select>
+                                    </td>
+                                    <td style={{ padding: '15px 10px', textAlign: 'right' }}>
+                                        <button 
+                                            onClick={() => setSelectedItem(selectedItem?.id === bid.id ? null : bid)}
+                                            style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}
+                                        >
+                                            {selectedItem?.id === bid.id ? 'Ocultar' : 'Ver Productos'}
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                )}
+            </div>
+
+            {/* Detalle Desplegable */}
+            {selectedItem && (
+                <div className="glass-panel" style={{ padding: '20px', animation: 'fadeIn 0.3s' }}>
+                    <h3 style={{ margin: '0 0 15px 0', color: '#3b82f6' }}>Detalle de Licitación: {selectedItem.id}</h3>
+                    <p style={{ margin: '0 0 20px 0', color: 'var(--text-secondary)' }}>{selectedItem.name}</p>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
+                        <div>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-secondary)', marginBottom: '5px', fontSize: '0.85rem' }}>
+                                <Package size={16} /> Costo Producto
+                            </span>
+                            <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
+                                ${Number(selectedItem.postulationDraft?.productCost || 0).toLocaleString('es-CL')}
+                            </div>
+                        </div>
+                        <div>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-secondary)', marginBottom: '5px', fontSize: '0.85rem' }}>
+                                <Truck size={16} /> Costo Envío
+                            </span>
+                            <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
+                                ${Number(selectedItem.postulationDraft?.shippingCost || 0).toLocaleString('es-CL')}
+                            </div>
+                        </div>
+                        <div>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-secondary)', marginBottom: '5px', fontSize: '0.85rem' }}>
+                                <Percent size={16} /> Margen Aplicado
+                            </span>
+                            <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#8b5cf6' }}>
+                                {selectedItem.postulationDraft?.margin || 0}%
+                            </div>
+                        </div>
+                        <div>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-secondary)', marginBottom: '5px', fontSize: '0.85rem' }}>
+                                <Calculator size={16} /> Total Ofertado
+                            </span>
+                            <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#10b981' }}>
+                                ${(selectedItem.biddedPrice || 0).toLocaleString('es-CL')}
+                            </div>
+                        </div>
+                    </div>
+
+                    {selectedItem.postulationDraft?.supplierLink && (
+                        <div style={{ marginTop: '25px', padding: '15px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
+                            <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Enlace del Proveedor:</h4>
+                            <a 
+                                href={selectedItem.postulationDraft.supplierLink} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                style={{ color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '5px', textDecoration: 'none', wordBreak: 'break-all' }}
+                            >
+                                <ExternalLink size={16} /> {selectedItem.postulationDraft.supplierLink}
+                            </a>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}

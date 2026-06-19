@@ -9,6 +9,7 @@ import RecommendationsPanel from './RecommendationsPanel';
 import Top20View from './Top20View';
 import MarketIntelligenceView from './MarketIntelligenceView';
 import PostulationsView from './PostulationsView';
+import SubmittedView from './SubmittedView';
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('explorer');
@@ -49,7 +50,7 @@ export default function Dashboard() {
   const [isSyncPaused, setIsSyncPaused] = useState(false);
   const isSyncPausedRef = useRef(false);
   const [error, setError] = useState(null);
-  const [submittedBids, setSubmittedBids] = useState({});
+  const [submittedBids, setSubmittedBids] = useState([]);
   
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -139,19 +140,60 @@ export default function Dashboard() {
   const syncRef = useRef(false);
 
   useEffect(() => {
-    try {
-        const saved = localStorage.getItem('comprasAgilesSubmittedBids');
-        if (saved) {
-            setSubmittedBids(JSON.parse(saved));
-        }
-    } catch (e) { console.error('Error loading submitted bids', e); }
+    // Fetch submitted bids from Turso
+    fetch('/api/submitted')
+        .then(res => res.json())
+        .then(data => {
+            if (data.success && data.data) {
+                setSubmittedBids(data.data);
+            }
+        })
+        .catch(console.error);
   }, []);
 
-  useEffect(() => {
-      try {
-          localStorage.setItem('comprasAgilesSubmittedBids', JSON.stringify(submittedBids));
-      } catch (e) { console.error('Error saving submitted bids', e); }
-  }, [submittedBids]);
+  const handleMarkBidded = (tender, draft, calc) => {
+      // Remove from selectedTenders (Postulations)
+      setSelectedTenders(prev => prev.filter(t => t.id !== tender.id));
+      
+      const newBid = {
+          ...tender,
+          isBidded: 1,
+          bidStatus: 'postulada',
+          biddedDate: new Date().toLocaleString('es-CL'),
+          biddedPrice: calc.total,
+          biddedMargin: draft.margin || 0,
+          postulationDraft: draft
+      };
+      
+      setSubmittedBids(prev => [newBid, ...prev.filter(t => t.id !== tender.id)]);
+      
+      // Save to API
+      fetch('/api/postulations/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+              id: tender.id, 
+              isBidded: true,
+              bidStatus: 'postulada',
+              biddedDate: newBid.biddedDate,
+              biddedPrice: newBid.biddedPrice,
+              biddedMargin: newBid.biddedMargin
+          })
+      }).catch(console.error);
+  };
+
+  const handleBidStatusChange = (tender, newStatus) => {
+      setSubmittedBids(prev => prev.map(t => t.id === tender.id ? { ...t, bidStatus: newStatus } : t));
+      
+      fetch('/api/postulations/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+              id: tender.id, 
+              bidStatus: newStatus
+          })
+      }).catch(console.error);
+  };
 
   useEffect(() => {
     isSyncPausedRef.current = isSyncPaused;
@@ -342,7 +384,7 @@ export default function Dashboard() {
         if (item && item.id) dataMap.set(item.id, item);
     });
 
-    let result = Array.from(dataMap.values()).filter(item => !submittedBids[item.id]);
+    let result = Array.from(dataMap.values()).filter(item => !submittedBids.some(b => b.id === item.id));
     
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
@@ -693,7 +735,7 @@ export default function Dashboard() {
               </div>
               <Top20View 
                  data={vettedData.filter(item => {
-                     if (submittedBids[item.id]) return false;
+                     if (submittedBids.some(b => b.id === item.id)) return false;
                      if (activeTab === 'suggested-1' && item.callNumber === 2) return false;
                      if (activeTab === 'suggested-2' && item.callNumber !== 2) return false;
                      return true;
@@ -709,57 +751,15 @@ export default function Dashboard() {
           <PostulationsView 
               selectedTenders={selectedTenders} 
               onToggleSelection={handleToggleSelection} 
+              onMarkBidded={handleMarkBidded}
           />
       )}
 
       {activeTab === 'submitted' && (
-          <div className="glass-panel" style={{ padding: '25px', animation: 'fadeIn 0.5s ease-in-out' }}>
-              <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#3b82f6', margin: '0 0 20px 0' }}>
-                  <CheckCircle size={28} />
-                  Licitaciones Postuladas
-              </h2>
-              {Object.keys(submittedBids).length === 0 ? (
-                  <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                      No tienes licitaciones marcadas como postuladas todavía.
-                  </div>
-              ) : (
-                  <div style={{ overflowX: 'auto' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                          <thead>
-                              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                                  <th style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>ID Licitación</th>
-                                  <th style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>Título</th>
-                                  <th style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>Fecha Postulación</th>
-                                  <th style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>Precio PDF</th>
-                                  <th style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>Acción</th>
-                              </tr>
-                          </thead>
-                          <tbody>
-                              {Object.values(submittedBids).map((bid) => (
-                                  <tr key={bid.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                      <td style={{ padding: '15px 10px', color: '#60a5fa' }}>{bid.id}</td>
-                                      <td style={{ padding: '15px 10px', color: 'white' }}>{bid.name}</td>
-                                      <td style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>{bid.submittedAt}</td>
-                                      <td style={{ padding: '15px 10px', color: '#10b981', fontWeight: 'bold' }}>{bid.quotedPrice}</td>
-                                      <td style={{ padding: '15px 10px' }}>
-                                          <button 
-                                              onClick={() => {
-                                                  const newBids = {...submittedBids};
-                                                  delete newBids[bid.id];
-                                                  setSubmittedBids(newBids);
-                                              }}
-                                              style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: 'none', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer' }}
-                                          >
-                                              Eliminar
-                                          </button>
-                                      </td>
-                                  </tr>
-                              ))}
-                          </tbody>
-                      </table>
-                  </div>
-              )}
-          </div>
+          <SubmittedView 
+              submittedBids={submittedBids} 
+              onStatusChange={handleBidStatusChange} 
+          />
       )}
       
       {selectedItem && (

@@ -96,6 +96,7 @@ export default function DataTable({ data, onRowClick, isLoading, isRefreshingExc
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <input 
                  type="checkbox" 
+                 style={{ transform: 'scale(1.5)', cursor: 'pointer', margin: '0 8px 0 4px' }}
                  checked={selectedTenders.some(t => t.id === item.id)}
                  onClick={(e) => e.stopPropagation()}
                  onChange={(e) => {

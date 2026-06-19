@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Truck, Percent, Calculator, FileText, Download, Trash2, ExternalLink } from 'lucide-react';
+import { Package, Truck, Percent, Calculator, FileText, Download, Trash2, ExternalLink, Copy } from 'lucide-react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
-export default function PostulationsView({ selectedTenders, onToggleSelection }) {
+export default function PostulationsView({ selectedTenders, onToggleSelection, onMarkBidded }) {
   const [drafts, setDrafts] = useState({});
   const debounceRef = React.useRef({});
 
@@ -135,16 +135,38 @@ export default function PostulationsView({ selectedTenders, onToggleSelection })
 
         return (
           <div key={tender.id} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '15px', position: 'relative' }}>
-            <button 
-                onClick={() => onToggleSelection(tender, false)}
-                style={{ position: 'absolute', top: '15px', right: '15px', background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', opacity: 0.7 }}
-                title="Quitar de postulaciones"
-            >
-                <Trash2 size={18} />
-            </button>
+            <div style={{ position: 'absolute', top: '15px', right: '15px', display: 'flex', alignItems: 'center', gap: '15px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#10b981', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 'bold' }}>
+                    <input 
+                        type="checkbox" 
+                        style={{ transform: 'scale(1.2)', cursor: 'pointer' }}
+                        onChange={(e) => {
+                            if (e.target.checked && onMarkBidded) {
+                                onMarkBidded(tender, draft, calc);
+                            }
+                        }}
+                    /> Licitado
+                </label>
+                <button 
+                    onClick={() => onToggleSelection(tender, false)}
+                    style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', opacity: 0.7 }}
+                    title="Quitar de postulaciones"
+                >
+                    <Trash2 size={18} />
+                </button>
+            </div>
             
-            <div>
-                <span style={{ fontSize: '0.75rem', background: 'rgba(59, 130, 246, 0.2)', color: '#3b82f6', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>{tender.id}</span>
+            <div style={{ paddingRight: '120px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '0.75rem', background: 'rgba(59, 130, 246, 0.2)', color: '#3b82f6', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>{tender.id}</span>
+                    <button 
+                        onClick={() => navigator.clipboard.writeText(tender.id)}
+                        style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '2px' }}
+                        title="Copiar ID"
+                    >
+                        <Copy size={14} />
+                    </button>
+                </div>
                 <h4 style={{ margin: '8px 0 4px', fontSize: '1rem', lineHeight: '1.3' }}>{tender.name}</h4>
                 <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{tender.organization}</p>
             </div>
