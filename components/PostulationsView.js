@@ -1,10 +1,176 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Truck, Percent, Calculator, FileText, Download, Trash2, ExternalLink, Copy } from 'lucide-react';
+import { Package, Truck, Percent, Calculator, FileText, Download, Trash2, ExternalLink, Copy, Search, ExternalLink as ExtLink } from 'lucide-react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
+const IntelligentWidget = ({ tender, onUpdateQuoter }) => {
+    const [loading, setLoading] = useState(true);
+    const [items, setItems] = useState([]);
+    const [meliResultsMap, setMeliResultsMap] = useState({});
+    const [selectedMap, setSelectedMap] = useState({});
+    const [queries, setQueries] = useState({});
+    const [isSearchingMeli, setIsSearchingMeli] = useState({});
+
+    const extractHeuristicKeyword = (tenderName, itemName, itemDesc) => {
+        const combined = `${tenderName} ${itemName} ${itemDesc || ''}`.toUpperCase();
+        const products = ["UPS", "NOTEBOOK", "LAPTOP", "IMPRESORA", "TONER", "TINTA", "PAPEL", "DISCO DURO", "SSD", "MEMORIA", "MONITOR", "CABLE", "ROUTER", "SWITCH", "SERVIDOR", "TECLADO", "MOUSE"];
+        let mainProduct = products.find(p => combined.includes(p));
+        
+        if (mainProduct) {
+            const specs = combined.match(/\b\d+(W|V|VA|GB|TB|MB|GHZ|HZ|AH|RPM)\b/g);
+            let query = mainProduct;
+            if (specs) query += " " + Array.from(new Set(specs)).slice(0, 2).join(" ");
+            return query;
+        }
+        return itemName;
+    };
+    
+    useEffect(() => {
+        async function init() {
+            setLoading(true);
+            try {
+                const res = await fetch(`/api/scrape-detail?id=${tender.id}`);
+                const data = await res.json();
+                let fetchedItems = data.data?.productos_solicitados || [];
+                if (fetchedItems.length === 0) fetchedItems = [{nombre: data.data?.nombre || tender.name}];
+                setItems(fetchedItems);
+                
+                const initialQueries = {};
+                const queriesList = fetchedItems.map((i, idx) => {
+                    const q = extractHeuristicKeyword(tender.name, i.nombre, i.descripcion);
+                    initialQueries[idx] = q;
+                    return q;
+                });
+                setQueries(initialQueries);
+                
+                const mlRes = await fetch(`/api/mercadolibre-bulk`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ queries: queriesList })
+                });
+                const mlData = await mlRes.json();
+                if (mlData.success) {
+                    setMeliResultsMap(mlData.resultsMap);
+                }
+            } catch (e) {
+                console.error("Error cargando widget:", e);
+            }
+            setLoading(false);
+        }
+        init();
+    }, [tender.id]);
+
+    const handleSelect = (idx, prod) => {
+        const newSelected = { ...selectedMap, [idx]: prod };
+        setSelectedMap(newSelected);
+        
+        let sum = 0;
+        let links = [];
+        items.forEach((_, i) => {
+            if (newSelected[i]) {
+                const qty = Number(items[i]?.cantidad) || 1;
+                sum += newSelected[i].price * qty;
+                links.push(newSelected[i].permalink);
+            }
+        });
+        onUpdateQuoter(sum, links.join('\n'));
+    };
+
+    const handleManualSearch = async (idx) => {
+        const query = queries[idx];
+        if (!query) return;
+        
+        setIsSearchingMeli(prev => ({...prev, [idx]: true}));
+        try {
+            const res = await fetch(`/api/mercadolibre?q=${encodeURIComponent(query)}`);
+            const data = await res.json();
+            if (data.success && data.results) {
+                setMeliResultsMap(prev => ({...prev, [idx]: data.results}));
+            } else {
+                setMeliResultsMap(prev => ({...prev, [idx]: []}));
+            }
+        } catch (e) {
+            console.error("Error buscando manualmente:", e);
+        }
+        setIsSearchingMeli(prev => ({...prev, [idx]: false}));
+    };
+
+    if (loading) return (
+        <div style={{background: 'rgba(59, 130, 246, 0.1)', border: '1px solid #3b82f6', borderRadius: '8px', padding: '20px', marginTop: '10px', textAlign: 'center'}}>
+            <div style={{width: '30px', height: '30px', border: '3px solid rgba(59, 130, 246, 0.3)', borderTopColor: '#3b82f6', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 10px'}}></div>
+            <p style={{color: '#60a5fa', margin: 0}}>Analizando licitación y buscando en MeliPulse...</p>
+        </div>
+    );
+
+    return (
+        <div className="animate-fade-in" style={{background: 'linear-gradient(180deg, rgba(59, 130, 246, 0.15) 0%, rgba(139, 92, 246, 0.1) 100%)', border: '1px solid #3b82f6', borderRadius: '8px', padding: '15px', marginTop: '10px'}}>
+            <h5 style={{margin: '0 0 15px 0', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '8px'}}><Calculator size={16}/> Sugerencias de Productos (Autollenado)</h5>
+            {items.map((item, idx) => (
+                <div key={idx} style={{marginBottom: '15px', background: 'rgba(0,0,0,0.3)', padding: '12px', borderRadius: '8px', borderLeft: '3px solid #8b5cf6'}}>
+                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px'}}>
+                        <div style={{flex: 1, paddingRight: '15px'}}>
+                            <strong style={{color: 'white', fontSize: '0.9rem'}}>{item.nombre}</strong>
+                            <div style={{color: '#9ca3af', fontSize: '0.8rem'}}>Cantidad requerida: {item.cantidad || 1} {item.unidad_medida || 'unidades'}</div>
+                        </div>
+                        <a href={`https://www.google.cl/search?q=${encodeURIComponent(item.nombre)}&tbm=shop`} target="_blank" rel="noreferrer" style={{background: 'white', color: '#ea4335', padding: '6px 10px', borderRadius: '6px', fontSize: '0.8rem', textDecoration: 'none', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: '0 2px 4px rgba(0,0,0,0.2)'}}>
+                            <Search size={14}/> Google Chile
+                        </a>
+                    </div>
+                    
+                    <div style={{display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'center'}}>
+                        <input 
+                            type="text" 
+                            value={queries[idx] || ''} 
+                            onChange={(e) => setQueries(prev => ({...prev, [idx]: e.target.value}))}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleManualSearch(idx); }}
+                            placeholder="Buscar en MeliPulse..."
+                            style={{flex: 1, padding: '8px 12px', borderRadius: '6px', border: '1px solid #4b5563', background: 'rgba(0,0,0,0.5)', color: 'white', fontSize: '0.9rem'}}
+                        />
+                        <button 
+                            onClick={() => handleManualSearch(idx)}
+                            disabled={isSearchingMeli[idx]}
+                            style={{background: '#3b82f6', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', opacity: isSearchingMeli[idx] ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: '5px'}}
+                        >
+                            {isSearchingMeli[idx] ? <div style={{width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 1s linear infinite'}}></div> : <Search size={14}/>}
+                            Buscar
+                        </button>
+                    </div>
+                    
+                    {(!meliResultsMap[idx] || meliResultsMap[idx].length === 0) && !isSearchingMeli[idx] ? (
+                        <p style={{color: '#f87171', fontSize: '0.85rem', margin: 0}}>MeliPulse no encontró resultados para "{queries[idx]}". Intenta modificar la búsqueda o usa Google.</p>
+                    ) : (
+                        <div style={{display: 'flex', overflowX: 'auto', gap: '10px', paddingBottom: '5px'}} className="custom-scrollbar">
+                            {meliResultsMap[idx].map(prod => {
+                                const isSelected = selectedMap[idx]?.id === prod.id;
+                                return (
+                                    <div key={prod.id} onClick={() => handleSelect(idx, prod)} style={{minWidth: '140px', maxWidth: '140px', background: isSelected ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255,255,255,0.05)', border: isSelected ? '2px solid #10b981' : '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '8px', cursor: 'pointer', transition: '0.2s', display: 'flex', flexDirection: 'column'}}>
+                                        <div style={{background: 'white', borderRadius: '4px', padding: '4px', marginBottom: '6px', height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+                                            <img src={prod.thumbnail} alt={prod.title} style={{maxHeight: '100%', maxWidth: '100%', objectFit: 'contain'}} />
+                                        </div>
+                                        <div style={{fontSize: '0.75rem', height: '2.8em', overflow: 'hidden', color: 'white', marginBottom: '5px', lineHeight: 1.2}}>{prod.title}</div>
+                                        <div style={{marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                                            <span style={{color: '#10b981', fontWeight: 'bold'}}>${prod.price.toLocaleString('es-CL')}</span>
+                                            {isSelected && <span style={{fontSize: '0.7rem', background: '#10b981', color: 'white', padding: '2px 4px', borderRadius: '3px'}}>Elegido</span>}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            ))}
+            {Object.keys(selectedMap).length === items.length && (
+                <div style={{background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', padding: '10px', borderRadius: '6px', textAlign: 'center', fontWeight: 'bold', fontSize: '0.9rem'}}>
+                    ¡Todos los ítems seleccionados! Costos y enlaces prellenados.
+                </div>
+            )}
+        </div>
+    );
+};
+
 export default function PostulationsView({ selectedTenders, onToggleSelection, onMarkBidded, onOpenDetail }) {
   const [drafts, setDrafts] = useState({});
+  const [expandedQuoters, setExpandedQuoters] = useState({});
   const debounceRef = React.useRef({});
 
   // Initialize drafts for newly selected tenders
@@ -170,16 +336,26 @@ export default function PostulationsView({ selectedTenders, onToggleSelection, o
                 <h4 style={{ margin: '8px 0 4px', fontSize: '1rem', lineHeight: '1.3' }}>{tender.name}</h4>
                 <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{tender.organization}</p>
                 <button
-                    onClick={() => onOpenDetail && onOpenDetail(tender)}
+                    onClick={() => setExpandedQuoters(prev => ({...prev, [tender.id]: !prev[tender.id]}))}
                     style={{
-                        marginTop: '10px', background: 'linear-gradient(90deg, #8b5cf6, #d946ef)', color: 'white',
-                        border: 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 'bold',
-                        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
+                        marginTop: '10px', background: expandedQuoters[tender.id] ? 'rgba(139, 92, 246, 0.2)' : 'linear-gradient(90deg, #8b5cf6, #d946ef)', color: expandedQuoters[tender.id] ? '#c4b5fd' : 'white',
+                        border: expandedQuoters[tender.id] ? '1px solid #8b5cf6' : 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 'bold',
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', transition: '0.2s'
                     }}
                 >
-                    <Calculator size={14} /> 🤖 Usar Motor Cotizador Inteligente
+                    <Calculator size={14} /> {expandedQuoters[tender.id] ? 'Cerrar Motor Cotizador' : '🤖 Usar Motor Cotizador Inteligente'}
                 </button>
             </div>
+            
+            {expandedQuoters[tender.id] && (
+                <IntelligentWidget 
+                    tender={tender} 
+                    onUpdateQuoter={(sumCost, urls) => {
+                        updateDraft(tender.id, 'productCost', sumCost);
+                        updateDraft(tender.id, 'supplierLink', urls);
+                    }} 
+                />
+            )}
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', background: 'rgba(0,0,0,0.2)', padding: '15px', borderRadius: '8px' }}>
                 <div style={{ gridColumn: '1 / -1' }}>
