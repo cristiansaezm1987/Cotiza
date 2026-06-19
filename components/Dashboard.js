@@ -33,7 +33,7 @@ export default function Dashboard() {
     excel: { active: false, progress: 0, message: '' }
   });
 
-  const [dbStats, setDbStats] = useState({ totalCount: 0, lastSync: null });
+  const [dbStats, setDbStats] = useState({ global: {}, base1: {}, base2: {} });
 
   useEffect(() => {
     let tick = 0;
@@ -456,7 +456,7 @@ export default function Dashboard() {
             <div style={{ background: 'rgba(0,0,0,0.2)', padding: '10px 14px', borderRadius: '8px', borderLeft: '4px solid #3b82f6' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#60a5fa', marginBottom: '4px', fontWeight: 'bold' }}>
                     <span>Estado: Base Local (SQLite)</span>
-                    <span>{dbStats.totalCount !== undefined && dbStats.totalCount !== null ? `${dbStats.totalCount} licitaciones guardadas` : 'Consultando...'}</span>
+                    <span>{dbStats.base1?.totalCount !== undefined ? `${dbStats.base1.totalCount} licitaciones guardadas` : 'Consultando...'}</span>
                 </div>
                 {syncStatus.incremental.active || syncStatus.full.active ? (
                     <>
@@ -470,7 +470,8 @@ export default function Dashboard() {
                     </>
                 ) : (
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                        Inactivo. Última sincronización registrada: {dbStats.lastSync ? new Date(dbStats.lastSync).toLocaleString('es-CL') : 'Desconocida'}
+                        Inactivo. Última sincronización registrada: {dbStats.base1?.lastSync ? new Date(dbStats.base1.lastSync).toLocaleString('es-CL') : 'Desconocida'}
+                        {dbStats.base1?.oldestDate && ` | Historial: ${new Date(dbStats.base1.oldestDate).toLocaleDateString('es-CL')} ➔ ${new Date(dbStats.base1.newestDate).toLocaleDateString('es-CL')}`}
                     </div>
                 )}
             </div>
@@ -479,7 +480,7 @@ export default function Dashboard() {
             <div style={{ background: 'rgba(0,0,0,0.2)', padding: '10px 14px', borderRadius: '8px', borderLeft: '4px solid #10b981' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#10b981', marginBottom: '4px', fontWeight: 'bold' }}>
                     <span>Estado: Base Excel (Segundos Llamados)</span>
-                    <span>Guardado en Nube (Turso)</span>
+                    <span>{dbStats.base2?.totalCount !== undefined ? `${dbStats.base2.totalCount} licitaciones en Nube (Turso)` : 'Guardado en Nube (Turso)'}</span>
                 </div>
                 {syncStatus.excel && syncStatus.excel.active ? (
                     <>
@@ -494,6 +495,7 @@ export default function Dashboard() {
                 ) : (
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                         Presiona "Descargar Excel" en tu servidor local para actualizar los datos en la nube.
+                        {dbStats.base2?.oldestDate && ` | Historial: ${new Date(dbStats.base2.oldestDate).toLocaleDateString('es-CL')} ➔ ${new Date(dbStats.base2.newestDate).toLocaleDateString('es-CL')}`}
                     </div>
                 )}
             </div>
