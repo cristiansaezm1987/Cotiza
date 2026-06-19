@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Package, Truck, Percent, Calculator, FileText, Download, Trash2, ExternalLink, Copy, Search, ExternalLink as ExtLink } from 'lucide-react';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 
 const IntelligentWidget = ({ tender, onUpdateQuoter }) => {
     const [loading, setLoading] = useState(true);
@@ -258,7 +258,7 @@ export default function PostulationsView({ selectedTenders, onToggleSelection, o
     doc.text(splitTitle, 14, 70);
 
     // Table
-    doc.autoTable({
+    autoTable(doc, {
       startY: 85,
       headStyles: { fillColor: [41, 128, 185] },
       head: [['Descripción', 'Cantidad', 'Valor Unitario Neto', 'Subtotal Neto']],
@@ -273,7 +273,7 @@ export default function PostulationsView({ selectedTenders, onToggleSelection, o
     });
 
     // Footer notes
-    const finalY = doc.lastAutoTable.finalY || 120;
+    const finalY = doc.lastAutoTable?.finalY || 120;
     doc.setFontSize(9);
     doc.setTextColor(100);
     doc.text("Notas:", 14, finalY + 10);
