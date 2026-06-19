@@ -167,21 +167,47 @@ export default function Dashboard() {
           
           while (vettingQueueRef.current.length > 0) {
               const candidate = vettingQueueRef.current.shift();
+              let finalScore = candidate.biScore;
+              let finalReasons = [...candidate.biReasons];
+              let descPreview = '';
+
               try {
                   const res = await fetch(`/api/scrape-detail?id=${candidate.id}`);
                   const json = await res.json();
+                  let passedDeepVetting = false;
+
                   if (json.success && json.data) {
                       const descLower = (json.data.descripcion || '').toLowerCase();
                       const COMPLEX_DESC = ['anexo', 'adjunto', 'archivo adjunto', 'ver archivo', 'ver anexo', 'ver detalle adjunto', 'según anexo', 'segun anexo', 'según especificaciones', 'bases adjuntas'];
                       if (descLower.length >= 20 && !COMPLEX_DESC.some(kw => descLower.includes(kw))) {
-                          candidate.biReasons.push('100% Simple (Sin Anexos)');
-                          candidate.descriptionPreview = json.data.descripcion;
-                          setVettedData(prev => {
-                              if (prev.some(p => p.id === candidate.id)) return prev;
-                              return [...prev, candidate].sort((a,b) => b.biScore - a.biScore);
-                          });
+                          finalReasons.push('100% Simple (Sin Anexos)');
+                          descPreview = json.data.descripcion;
+                          passedDeepVetting = true;
                       }
                   }
+
+                  if (!passedDeepVetting) {
+                      finalScore = -1;
+                  } else {
+                      candidate.biReasons = finalReasons;
+                      candidate.descriptionPreview = descPreview;
+                      setVettedData(prev => {
+                          if (prev.some(p => p.id === candidate.id)) return prev;
+                          return [...prev, candidate].sort((a,b) => b.biScore - a.biScore);
+                      });
+                  }
+
+                  await fetch('/api/vetting/save', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                          id: candidate.id,
+                          isVetted: 1,
+                          biScore: finalScore,
+                          biReasons: finalReasons,
+                          descriptionPreview: descPreview
+                      })
+                  });
               } catch (e) { console.error('Vetting Error', e); }
               setVettingProgress(prev => ({ ...prev, current: prev.current + 1 }));
           }
@@ -209,13 +235,32 @@ export default function Dashboard() {
       setData(newData);
       setTotalCount(newTotal);
       
+      const alreadyVetted = [];
       newData.forEach(item => {
           if (!processedIdsRef.current.has(item.id)) {
               processedIdsRef.current.add(item.id);
-              const scoredItem = calculateBiScore(item);
-              if (scoredItem.biScore >= 0) vettingQueueRef.current.push(scoredItem);
+              
+              if (item.isVetted === 1) {
+                  if (item.biScore >= 0) {
+                      item.biReasons = item.biReasons ? JSON.parse(item.biReasons) : [];
+                      alreadyVetted.push(item);
+                  }
+              } else {
+                  const scoredItem = calculateBiScore(item);
+                  if (scoredItem.biScore >= 0) vettingQueueRef.current.push(scoredItem);
+              }
           }
       });
+      
+      if (alreadyVetted.length > 0) {
+          setVettedData(prev => {
+              const newMap = new Map();
+              prev.forEach(p => newMap.set(p.id, p));
+              alreadyVetted.forEach(p => newMap.set(p.id, p));
+              return Array.from(newMap.values()).sort((a,b) => b.biScore - a.biScore);
+          });
+      }
+      
       vettingQueueRef.current.sort((a,b) => b.biScore - a.biScore);
       setVettingProgress({ current: 0, total: vettingQueueRef.current.length });
       

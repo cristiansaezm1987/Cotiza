@@ -28,7 +28,11 @@ export async function GET(request) {
       region: item.region,
       closeDate: item.closeDate,
       deliveryDays: item.deliveryDays,
-      callNumber: item.callNumber
+      callNumber: item.callNumber,
+      isVetted: item.isVetted,
+      biScore: item.biScore,
+      biReasons: item.biReasons,
+      descriptionPreview: item.descriptionPreview
     }));
 
     return NextResponse.json({ success: true, data: formattedData, totalCount });
