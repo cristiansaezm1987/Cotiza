@@ -99,6 +99,7 @@ export default function Top20View({ data, filters, selectedTenders = [], onToggl
                 <input 
                    type="checkbox" 
                    checked={selectedTenders.some(t => t.id === item.id)}
+                   onClick={(e) => e.stopPropagation()}
                    onChange={(e) => {
                        e.stopPropagation();
                        if (onToggleSelection) {

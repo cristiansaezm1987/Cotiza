@@ -29,7 +29,7 @@ export async function GET(request) {
       });
       
       try {
-          const res = await fetch(`https://api.buscador.mercadopublico.cl/compra-agil?order_by=recent&page_number=${pagesFetched}`, {
+          const res = await fetch(`https://api.buscador.mercadopublico.cl/compra-agil?order_by=recent&status=2&page_number=${pagesFetched}`, {
               headers: headersToSteal
           });
           

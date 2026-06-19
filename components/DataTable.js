@@ -97,6 +97,7 @@ export default function DataTable({ data, onRowClick, isLoading, isRefreshingExc
               <input 
                  type="checkbox" 
                  checked={selectedTenders.some(t => t.id === item.id)}
+                 onClick={(e) => e.stopPropagation()}
                  onChange={(e) => {
                      e.stopPropagation();
                      if (onToggleSelection) {
