@@ -8,6 +8,12 @@ export default function Top20View({ data, filters, selectedTenders = [], onToggl
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 20;
 
+  const REGION_MAP = {
+      "15": "Arica", "1": "Tarapacá", "2": "Antofagasta", "3": "Atacama", "4": "Coquimbo",
+      "5": "Valparaíso", "13": "Metropolitana", "6": "O'Higgins", "7": "Maule", "16": "Ñuble",
+      "8": "Biobío", "9": "Araucanía", "14": "Los Ríos", "10": "Los Lagos", "11": "Aysén", "12": "Magallanes"
+  };
+
   // Filter the ALREADY VETTED data by ALL filters
   const filteredData = React.useMemo(() => {
     let filtered = data;
@@ -20,14 +26,17 @@ export default function Top20View({ data, filters, selectedTenders = [], onToggl
            );
         }
         if (filters.region && filters.region !== '') {
-           filtered = filtered.filter(item => item.region && item.region.toLowerCase().includes(filters.region.toLowerCase()));
+           const rName = REGION_MAP[filters.region];
+           if (rName) {
+               filtered = filtered.filter(item => item.region && item.region.toLowerCase().includes(rName.toLowerCase()));
+           }
         }
         if (filters.status && filters.status !== '') {
            filtered = filtered.filter(item => item.statusName === filters.status);
         }
-        if (filters.callNumber && filters.callNumber !== '') {
-           filtered = filtered.filter(item => String(item.callNumber) === filters.callNumber);
-        }
+         if (filters.callNumber && filters.callNumber !== '') {
+            filtered = filtered.filter(item => String(Number(item.callNumber) || 1) === filters.callNumber);
+         }
         if (filters.maxPrice && filters.maxPrice !== '') {
            const maxP = Number(filters.maxPrice);
            filtered = filtered.filter(item => Number(item.price) <= maxP);

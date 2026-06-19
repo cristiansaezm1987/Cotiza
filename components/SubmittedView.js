@@ -81,12 +81,15 @@ export default function SubmittedView({ submittedBids, onStatusChange }) {
                                 <th style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>Monto Cotizado</th>
                                 <th style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>Margen</th>
                                 <th style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>Estado</th>
-                                <th style={{ padding: '15px 10px', color: 'var(--text-secondary)', textAlign: 'right' }}>Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
                             {submittedBids.map((bid) => (
-                                <tr key={bid.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', transition: '0.2s', background: selectedItem?.id === bid.id ? 'rgba(255,255,255,0.05)' : 'transparent' }}>
+                                <tr 
+                                    key={bid.id} 
+                                    onClick={() => setSelectedItem(selectedItem?.id === bid.id ? null : bid)}
+                                    style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', transition: '0.2s', cursor: 'pointer', background: selectedItem?.id === bid.id ? 'rgba(255,255,255,0.05)' : 'transparent' }}
+                                >
                                     <td style={{ padding: '15px 10px', color: '#60a5fa', fontWeight: 'bold' }}>{bid.id}</td>
                                     <td style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>{bid.biddedDate || 'N/A'}</td>
                                     <td style={{ padding: '15px 10px', color: '#10b981', fontWeight: 'bold' }}>
@@ -96,6 +99,7 @@ export default function SubmittedView({ submittedBids, onStatusChange }) {
                                     <td style={{ padding: '15px 10px' }}>
                                         <select 
                                             value={bid.bidStatus || 'postulada'} 
+                                            onClick={(e) => e.stopPropagation()}
                                             onChange={(e) => handleStatusChange(bid, e.target.value)}
                                             style={{ 
                                                 background: bid.bidStatus === 'ganada' ? 'rgba(16, 185, 129, 0.2)' : 
@@ -112,14 +116,6 @@ export default function SubmittedView({ submittedBids, onStatusChange }) {
                                             <option value="perdida">Perdida</option>
                                         </select>
                                     </td>
-                                    <td style={{ padding: '15px 10px', textAlign: 'right' }}>
-                                        <button 
-                                            onClick={() => setSelectedItem(selectedItem?.id === bid.id ? null : bid)}
-                                            style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}
-                                        >
-                                            {selectedItem?.id === bid.id ? 'Ocultar' : 'Ver Productos'}
-                                        </button>
-                                    </td>
                                 </tr>
                             ))}
                         </tbody>
@@ -127,60 +123,71 @@ export default function SubmittedView({ submittedBids, onStatusChange }) {
                 )}
             </div>
 
-            {/* Detalle Desplegable */}
+            {/* Detalle en Modal */}
             {selectedItem && (
-                <div className="glass-panel" style={{ padding: '20px', animation: 'fadeIn 0.3s' }}>
-                    <h3 style={{ margin: '0 0 15px 0', color: '#3b82f6' }}>Detalle de Licitación: {selectedItem.id}</h3>
-                    <p style={{ margin: '0 0 20px 0', color: 'var(--text-secondary)' }}>{selectedItem.name}</p>
-                    
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
-                        <div>
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-secondary)', marginBottom: '5px', fontSize: '0.85rem' }}>
-                                <Package size={16} /> Costo Producto
-                            </span>
-                            <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
-                                ${Number(selectedItem.postulationDraft?.productCost || 0).toLocaleString('es-CL')}
+                <div 
+                    style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'center', animation: 'fadeIn 0.2s' }} 
+                    onClick={() => setSelectedItem(null)}
+                >
+                    <div className="glass-panel" style={{ width: '90%', maxWidth: '800px', maxHeight: '90vh', overflowY: 'auto', padding: '30px', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+                        <button 
+                            onClick={() => setSelectedItem(null)} 
+                            style={{ position: 'absolute', top: '20px', right: '20px', background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        >
+                            &times;
+                        </button>
+                        <h3 style={{ margin: '0 0 15px 0', color: '#3b82f6' }}>Detalle de Licitación: {selectedItem.id}</h3>
+                        <p style={{ margin: '0 0 20px 0', color: 'var(--text-secondary)' }}>{selectedItem.name}</p>
+                        
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
+                            <div>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-secondary)', marginBottom: '5px', fontSize: '0.85rem' }}>
+                                    <Package size={16} /> Costo Producto
+                                </span>
+                                <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
+                                    ${Number(selectedItem.postulationDraft?.productCost || 0).toLocaleString('es-CL')}
+                                </div>
+                            </div>
+                            <div>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-secondary)', marginBottom: '5px', fontSize: '0.85rem' }}>
+                                    <Truck size={16} /> Costo Envío
+                                </span>
+                                <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
+                                    ${Number(selectedItem.postulationDraft?.shippingCost || 0).toLocaleString('es-CL')}
+                                </div>
+                            </div>
+                            <div>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-secondary)', marginBottom: '5px', fontSize: '0.85rem' }}>
+                                    <Percent size={16} /> Margen Aplicado
+                                </span>
+                                <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#8b5cf6' }}>
+                                    {selectedItem.postulationDraft?.margin || 0}%
+                                </div>
+                            </div>
+                            <div>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-secondary)', marginBottom: '5px', fontSize: '0.85rem' }}>
+                                    <Calculator size={16} /> Total Ofertado
+                                </span>
+                                <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#10b981' }}>
+                                    ${(selectedItem.biddedPrice || 0).toLocaleString('es-CL')}
+                                </div>
                             </div>
                         </div>
-                        <div>
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-secondary)', marginBottom: '5px', fontSize: '0.85rem' }}>
-                                <Truck size={16} /> Costo Envío
-                            </span>
-                            <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
-                                ${Number(selectedItem.postulationDraft?.shippingCost || 0).toLocaleString('es-CL')}
-                            </div>
-                        </div>
-                        <div>
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-secondary)', marginBottom: '5px', fontSize: '0.85rem' }}>
-                                <Percent size={16} /> Margen Aplicado
-                            </span>
-                            <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#8b5cf6' }}>
-                                {selectedItem.postulationDraft?.margin || 0}%
-                            </div>
-                        </div>
-                        <div>
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-secondary)', marginBottom: '5px', fontSize: '0.85rem' }}>
-                                <Calculator size={16} /> Total Ofertado
-                            </span>
-                            <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#10b981' }}>
-                                ${(selectedItem.biddedPrice || 0).toLocaleString('es-CL')}
-                            </div>
-                        </div>
-                    </div>
 
-                    {selectedItem.postulationDraft?.supplierLink && (
-                        <div style={{ marginTop: '25px', padding: '15px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
-                            <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Enlace del Proveedor:</h4>
-                            <a 
-                                href={selectedItem.postulationDraft.supplierLink} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                style={{ color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '5px', textDecoration: 'none', wordBreak: 'break-all' }}
-                            >
-                                <ExternalLink size={16} /> {selectedItem.postulationDraft.supplierLink}
-                            </a>
-                        </div>
-                    )}
+                        {selectedItem.postulationDraft?.supplierLink && (
+                            <div style={{ marginTop: '25px', padding: '15px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
+                                <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Enlace del Proveedor:</h4>
+                                <a 
+                                    href={selectedItem.postulationDraft.supplierLink} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    style={{ color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '5px', textDecoration: 'none', wordBreak: 'break-all' }}
+                                >
+                                    <ExternalLink size={16} /> {selectedItem.postulationDraft.supplierLink}
+                                </a>
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
         </div>

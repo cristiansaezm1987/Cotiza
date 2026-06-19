@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Calendar, FileText, Download, DollarSign, Package, Building2, AlertCircle, Paperclip, Activity, MapPin, Calculator, ShoppingCart } from 'lucide-react';
 import SmartQuoter from './SmartQuoter';
 
-export default function DetailModal({ item, onClose, onMarkSubmitted }) {
+export default function DetailModal({ item, onClose, onMarkSubmitted, activeTab, isSelected, onToggleSelection }) {
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -175,16 +175,18 @@ export default function DetailModal({ item, onClose, onMarkSubmitted }) {
                   <h3 style={{ fontSize: '1.1rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <FileText size={18} /> Descripción
                   </h3>
-                  <button 
-                     onClick={handleAnalyzeText} 
-                     disabled={isAnalyzing}
-                     style={{
-                         background: 'linear-gradient(90deg, #10b981, #059669)', border: 'none', color: 'white',
-                         padding: '6px 12px', borderRadius: '6px', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer',
-                         display: 'flex', alignItems: 'center', gap: '5px'
-                     }}>
-                      {isAnalyzing ? 'Procesando documentos e IA...' : '✨ Analizar con IA'}
-                  </button>
+                  {activeTab === 'postulations' && (
+                      <button 
+                         onClick={handleAnalyzeText} 
+                         disabled={isAnalyzing}
+                         style={{
+                             background: 'linear-gradient(90deg, #10b981, #059669)', border: 'none', color: 'white',
+                             padding: '6px 12px', borderRadius: '6px', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer',
+                             display: 'flex', alignItems: 'center', gap: '5px'
+                         }}>
+                          {isAnalyzing ? 'Procesando documentos e IA...' : '✨ Analizar con IA'}
+                      </button>
+                  )}
               </div>
               <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
                 {details.descripcion || 'Sin descripción adicional.'}
@@ -376,13 +378,38 @@ export default function DetailModal({ item, onClose, onMarkSubmitted }) {
               </div>
             )}
 
-            {/* Smart Quoter Component */}
-            <SmartQuoter 
-                item={item} 
-                details={details} 
-                aiKeywords={aiAnalysis?.keywords} 
-                onMarkSubmitted={onMarkSubmitted}
-            />
+            {/* Smart Quoter Component or Selection Checkbox depending on active tab */}
+            {activeTab === 'postulations' ? (
+                <SmartQuoter 
+                    item={item} 
+                    details={details} 
+                    aiKeywords={aiAnalysis?.keywords} 
+                    onMarkSubmitted={onMarkSubmitted}
+                />
+            ) : (
+                <div style={{ padding: '20px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid #3b82f6', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                        <h4 style={{ margin: '0 0 5px', color: '#60a5fa', fontSize: '1.1rem' }}>¿Te interesa esta licitación?</h4>
+                        <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Selecciónala para cotizarla con la Inteligencia Artificial en la pestaña de Postulaciones.</p>
+                    </div>
+                    <div 
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            if(onToggleSelection) {
+                                onToggleSelection(item, !isSelected);
+                            }
+                        }}
+                        style={{ display: 'flex', alignItems: 'center', gap: '10px', background: isSelected ? '#10b981' : 'rgba(255,255,255,0.1)', padding: '12px 24px', borderRadius: '8px', cursor: 'pointer', transition: '0.2s', color: 'white', fontWeight: 'bold' }}>
+                        <input 
+                            type="checkbox" 
+                            checked={isSelected || false}
+                            readOnly
+                            style={{ transform: 'scale(1.5)', cursor: 'pointer', pointerEvents: 'none' }}
+                        />
+                        {isSelected ? 'Seleccionada' : 'Seleccionar'}
+                    </div>
+                </div>
+            )}
 
             <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
               <a 

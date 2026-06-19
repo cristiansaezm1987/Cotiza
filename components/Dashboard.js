@@ -408,7 +408,7 @@ export default function Dashboard() {
     }
     
     if (filters.callNumber) {
-      result = result.filter(item => item.callNumber === Number(filters.callNumber));
+      result = result.filter(item => (Number(item.callNumber) || 1) === Number(filters.callNumber));
     }
     
     setTotalCount(result.length);
@@ -433,105 +433,129 @@ export default function Dashboard() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div style={{ display: 'flex', gap: '25px', alignItems: 'flex-start' }}>
       
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px', background: 'rgba(0,0,0,0.2)', padding: '15px', borderRadius: '12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          <RefreshButton onRefresh={handleRefreshAll} isLoading={isLoading} />
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          {error && <span style={{ color: 'var(--danger-color)', fontSize: '0.9rem' }}>{error}</span>}
-        </div>
-      </div>
-      
-      {vettingProgress.total > 0 && vettingProgress.current < vettingProgress.total && (
-        <div style={{ background: 'rgba(139, 92, 246, 0.1)', border: '1px solid #8b5cf6', padding: '15px', borderRadius: '12px', marginTop: '5px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.85rem', color: '#a78bfa', fontWeight: 'bold' }}>
-            <span>Analizando y puntuando licitaciones en segundo plano (Inteligencia)...</span>
-            <span>{vettingProgress.current} / {vettingProgress.total} ({Math.round((vettingProgress.current / vettingProgress.total) * 100)}%)</span>
+      {/* LATERAL MENU */}
+      <div style={{ 
+          width: '260px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '8px',
+          background: 'rgba(0,0,0,0.2)', padding: '20px', borderRadius: '12px',
+          position: 'sticky', top: '20px'
+      }}>
+          <h3 style={{ margin: '0 0 15px 0', fontSize: '1.1rem', color: 'white', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '10px' }}>Navegación</h3>
+          
+          <div style={{ marginBottom: '15px' }}>
+            <RefreshButton onRefresh={handleRefreshAll} isLoading={isLoading} />
           </div>
-          <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
-            <div style={{ 
-              height: '100%', 
-              width: `${(vettingProgress.current / vettingProgress.total) * 100}%`, 
-              background: 'linear-gradient(90deg, #8b5cf6, #d946ef)',
-              transition: 'width 0.3s ease'
-            }} />
-          </div>
-        </div>
-      )}
-      
-      <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+          
           <button
               onClick={() => setActiveTab('explorer')}
               style={{
-                  padding: '12px 24px', borderRadius: '8px', border: 'none', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', transition: '0.2s',
-                  background: activeTab === 'explorer' ? 'var(--primary-color)' : 'rgba(255,255,255,0.05)',
-                  color: activeTab === 'explorer' ? 'white' : 'var(--text-secondary)'
+                  padding: '12px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 'bold', transition: '0.2s',
+                  background: activeTab === 'explorer' ? 'var(--primary-color)' : 'transparent',
+                  color: activeTab === 'explorer' ? 'white' : 'var(--text-secondary)',
+                  justifyContent: 'flex-start'
               }}
           >
               <List size={18} /> Explorador General
           </button>
+          
           <button
               onClick={() => setActiveTab('suggested-1')}
               style={{
-                  padding: '12px 24px', borderRadius: '8px', border: 'none', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', transition: '0.2s',
-                  background: activeTab === 'suggested-1' ? '#8b5cf6' : 'rgba(255,255,255,0.05)',
-                  color: activeTab === 'suggested-1' ? 'white' : 'var(--text-secondary)'
+                  padding: '12px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 'bold', transition: '0.2s',
+                  background: activeTab === 'suggested-1' ? '#8b5cf6' : 'transparent',
+                  color: activeTab === 'suggested-1' ? 'white' : 'var(--text-secondary)',
+                  justifyContent: 'flex-start'
               }}
           >
               <Zap size={18} /> Sugeridas (1er Llamado)
           </button>
+          
           <button
               onClick={() => setActiveTab('suggested-2')}
               style={{
-                  padding: '12px 24px', borderRadius: '8px', border: 'none', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', transition: '0.2s',
-                  background: activeTab === 'suggested-2' ? '#d946ef' : 'rgba(255,255,255,0.05)',
-                  color: activeTab === 'suggested-2' ? 'white' : 'var(--text-secondary)'
+                  padding: '12px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 'bold', transition: '0.2s',
+                  background: activeTab === 'suggested-2' ? '#d946ef' : 'transparent',
+                  color: activeTab === 'suggested-2' ? 'white' : 'var(--text-secondary)',
+                  justifyContent: 'flex-start'
               }}
           >
               <Activity size={18} /> Sugeridas (2do Llamado)
           </button>
+          
           <button
               onClick={() => setActiveTab('historical')}
               style={{
-                  padding: '12px 24px', borderRadius: '8px', border: 'none', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', transition: '0.2s',
-                  background: activeTab === 'historical' ? 'var(--primary-color)' : 'rgba(255,255,255,0.05)',
-                  color: activeTab === 'historical' ? 'white' : 'var(--text-secondary)'
+                  padding: '12px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 'bold', transition: '0.2s',
+                  background: activeTab === 'historical' ? 'var(--primary-color)' : 'transparent',
+                  color: activeTab === 'historical' ? 'white' : 'var(--text-secondary)',
+                  justifyContent: 'flex-start'
               }}
           >
               <BookOpen size={18} /> Inteligencia Histórica
           </button>
           
+          <div style={{ height: '1px', background: 'rgba(255,255,255,0.1)', margin: '10px 0' }} />
+
           <button
               onClick={() => setActiveTab('postulations')}
               style={{
-                  padding: '12px 24px', borderRadius: '8px', border: 'none', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', transition: '0.2s',
-                  background: activeTab === 'postulations' ? 'var(--primary-color)' : 'rgba(255,255,255,0.05)',
-                  color: activeTab === 'postulations' ? 'white' : 'var(--text-secondary)'
+                  padding: '12px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 'bold', transition: '0.2s',
+                  background: activeTab === 'postulations' ? 'var(--primary-color)' : 'transparent',
+                  color: activeTab === 'postulations' ? 'white' : 'var(--text-secondary)',
+                  justifyContent: 'flex-start'
               }}
           >
               <CheckCircle size={18} /> Postulaciones ({selectedTenders.length})
           </button>
+          
           <button
               onClick={() => setActiveTab('submitted')}
               style={{
-                  padding: '12px 24px', borderRadius: '8px', border: 'none', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', transition: '0.2s',
-                  background: activeTab === 'submitted' ? '#3b82f6' : 'rgba(255,255,255,0.05)',
-                  color: activeTab === 'submitted' ? 'white' : 'var(--text-secondary)'
+                  padding: '12px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 'bold', transition: '0.2s',
+                  background: activeTab === 'submitted' ? '#3b82f6' : 'transparent',
+                  color: activeTab === 'submitted' ? 'white' : 'var(--text-secondary)',
+                  justifyContent: 'flex-start'
               }}
           >
               <CheckCircle size={18} /> Licitaciones Postuladas
           </button>
       </div>
+
+      {/* MAIN CONTENT AREA */}
+      <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0 }}>
+        
+        {error && (
+          <div style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '15px', borderRadius: '12px', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+            <span style={{ color: 'var(--danger-color)', fontSize: '0.9rem', fontWeight: 'bold' }}>{error}</span>
+          </div>
+        )}
+        
+        {vettingProgress.total > 0 && vettingProgress.current < vettingProgress.total && (
+          <div style={{ background: 'rgba(139, 92, 246, 0.1)', border: '1px solid #8b5cf6', padding: '15px', borderRadius: '12px', marginTop: '5px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.85rem', color: '#a78bfa', fontWeight: 'bold' }}>
+              <span>Analizando y puntuando licitaciones en segundo plano (Inteligencia)...</span>
+              <span>{vettingProgress.current} / {vettingProgress.total} ({Math.round((vettingProgress.current / vettingProgress.total) * 100)}%)</span>
+            </div>
+            <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+              <div style={{ 
+                height: '100%', 
+                width: `${(vettingProgress.current / vettingProgress.total) * 100}%`, 
+                background: 'linear-gradient(90deg, #8b5cf6, #d946ef)',
+                transition: 'width 0.3s ease'
+              }} />
+            </div>
+          </div>
+        )}
       
       {/* Database Sync Controls */}
+      {['explorer', 'suggested-1', 'suggested-2'].includes(activeTab) && (
       <div className="glass-panel animate-fade-in" style={{ padding: '15px 20px', display: 'flex', flexDirection: 'column', gap: '15px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid var(--accent-color)' }}>
          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
              <div>
@@ -635,6 +659,7 @@ export default function Dashboard() {
             </div>
          </div>
       </div>
+      )}
   
 
 
@@ -736,8 +761,9 @@ export default function Dashboard() {
               <Top20View 
                  data={vettedData.filter(item => {
                      if (submittedBids.some(b => b.id === item.id)) return false;
-                     if (activeTab === 'suggested-1' && item.callNumber === 2) return false;
-                     if (activeTab === 'suggested-2' && item.callNumber !== 2) return false;
+                     const cNum = Number(item.callNumber) || 1;
+                     if (activeTab === 'suggested-1' && cNum !== 1) return false;
+                     if (activeTab === 'suggested-2' && cNum !== 2) return false;
                      return true;
                  })} 
                  filters={filters} 
@@ -752,6 +778,7 @@ export default function Dashboard() {
               selectedTenders={selectedTenders} 
               onToggleSelection={handleToggleSelection} 
               onMarkBidded={handleMarkBidded}
+              onOpenDetail={(tender) => setSelectedItem(tender)}
           />
       )}
 
@@ -765,6 +792,9 @@ export default function Dashboard() {
       {selectedItem && (
         <DetailModal 
             item={selectedItem} 
+            activeTab={activeTab}
+            isSelected={selectedTenders.some(t => t.id === selectedItem.id)}
+            onToggleSelection={handleToggleSelection}
             onClose={() => setSelectedItem(null)} 
             onMarkSubmitted={(quoteInfo) => {
                 setSubmittedBids(prev => ({
@@ -780,6 +810,7 @@ export default function Dashboard() {
             }}
         />
       )}
+      </div>
     </div>
   );
 }

@@ -8,6 +8,20 @@ export default function MarketIntelligenceView() {
   const [results, setResults] = useState([]);
   const [searched, setSearched] = useState(false);
   const [days, setDays] = useState(1);
+  const [businessLines, setBusinessLines] = useState([]);
+  const [isLoadingLines, setIsLoadingLines] = useState(true);
+
+  React.useEffect(() => {
+    fetch('/api/stats/business-lines')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setBusinessLines(data.data);
+        }
+      })
+      .catch(err => console.error("Error loading lines:", err))
+      .finally(() => setIsLoadingLines(false));
+  }, []);
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -85,6 +99,45 @@ export default function MarketIntelligenceView() {
              Este motor utiliza tu <strong>API Ticket de Mercado Público</strong> para descargar las Órdenes de Compra reales de los últimos días y buscar exactamente lo que necesitas.
              Descubre a <strong>qué precio está comprando el Estado</strong> y ajusta tus márgenes para ganar las licitaciones actuales.
          </p>
+
+         {businessLines.length > 0 && (
+             <div style={{ marginBottom: '30px' }}>
+                 <h3 style={{ color: 'white', marginBottom: '15px', fontSize: '1.1rem' }}>Análisis por Líneas de Negocio (Últimas 500 Licitaciones)</h3>
+                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '15px' }}>
+                     {businessLines.map((line, idx) => (
+                         <div key={idx} 
+                              onClick={() => {
+                                  if (line.name !== 'Otros') {
+                                      setKeyword(line.name.split(' ')[0]);
+                                  }
+                              }}
+                              style={{ 
+                             background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(16, 185, 129, 0.2)', 
+                             borderRadius: '12px', padding: '15px', cursor: 'pointer', transition: 'all 0.2s ease',
+                             boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                         }}
+                         onMouseEnter={(e) => {
+                             e.currentTarget.style.transform = 'translateY(-2px)';
+                             e.currentTarget.style.borderColor = '#10b981';
+                         }}
+                         onMouseLeave={(e) => {
+                             e.currentTarget.style.transform = 'translateY(0)';
+                             e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.2)';
+                         }}>
+                             <h4 style={{ color: '#10b981', margin: '0 0 10px 0', fontSize: '1rem' }}>{line.name}</h4>
+                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+                                 <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Licitaciones</span>
+                                 <span style={{ color: 'white', fontWeight: 'bold' }}>{line.count}</span>
+                             </div>
+                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                 <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Ticket Promedio</span>
+                                 <span style={{ color: '#60a5fa', fontWeight: 'bold' }}>{formatCLP(line.avgAmount)}</span>
+                             </div>
+                         </div>
+                     ))}
+                 </div>
+             </div>
+         )}
 
          <form onSubmit={handleSearch} style={{ display: 'flex', gap: '15px', maxWidth: '700px' }}>
             <div style={{ flex: 1, position: 'relative' }}>

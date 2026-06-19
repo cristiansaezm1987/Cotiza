@@ -3,7 +3,7 @@ import { Package, Truck, Percent, Calculator, FileText, Download, Trash2, Extern
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
-export default function PostulationsView({ selectedTenders, onToggleSelection, onMarkBidded }) {
+export default function PostulationsView({ selectedTenders, onToggleSelection, onMarkBidded, onOpenDetail }) {
   const [drafts, setDrafts] = useState({});
   const debounceRef = React.useRef({});
 
@@ -169,6 +169,16 @@ export default function PostulationsView({ selectedTenders, onToggleSelection, o
                 </div>
                 <h4 style={{ margin: '8px 0 4px', fontSize: '1rem', lineHeight: '1.3' }}>{tender.name}</h4>
                 <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{tender.organization}</p>
+                <button
+                    onClick={() => onOpenDetail && onOpenDetail(tender)}
+                    style={{
+                        marginTop: '10px', background: 'linear-gradient(90deg, #8b5cf6, #d946ef)', color: 'white',
+                        border: 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 'bold',
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
+                    }}
+                >
+                    <Calculator size={14} /> 🤖 Usar Motor Cotizador Inteligente
+                </button>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', background: 'rgba(0,0,0,0.2)', padding: '15px', borderRadius: '8px' }}>
