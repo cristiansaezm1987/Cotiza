@@ -92,7 +92,29 @@ export async function GET(request) {
       }
     }
 
-    updateStatus('incremental', { progress: 98, message: 'Guardando datos finales en base local...' });
+    updateStatus('incremental', { progress: 98, message: 'Realizando barrido de estados expirados...' });
+    
+    // Quick sweep: find items that are 'Publicada' but their closeDate has passed
+    try {
+        const activeTenders = await db.all(`SELECT id, closeDate FROM tenders WHERE statusName = 'Publicada' AND closeDate IS NOT NULL`);
+        let expiredCount = 0;
+        const nowMs = Date.now();
+        
+        for (const t of activeTenders) {
+            const parts = t.closeDate.match(/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})/);
+            if (parts) {
+                const closeMs = new Date(`${parts[1]}-${parts[2]}-${parts[3]}T${parts[4]}:${parts[5]}:00-04:00`).getTime();
+                if (nowMs > closeMs) {
+                    await db.run(`UPDATE tenders SET statusName = 'Cerrada (Pendiente Actualización)' WHERE id = ?`, [t.id]);
+                    expiredCount++;
+                }
+            }
+        }
+        console.log(`Quick sweep updated ${expiredCount} expired tenders.`);
+    } catch (e) {
+        console.error('Sweep error:', e);
+    }
+
     // Wait for all background DB inserts to finish
     while (activeInserts > 0) {
       await new Promise(r => setTimeout(r, 500));
