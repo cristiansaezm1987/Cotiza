@@ -47,7 +47,7 @@ function AsyncDeliveryDays({ item }) {
   );
 }
 
-export default function DataTable({ data, onRowClick, isLoading, isRefreshingExcel }) {
+export default function DataTable({ data, onRowClick, isLoading, isRefreshingExcel, selectedTenders = [], onToggleSelection }) {
   if (isLoading) {
     return (
       <div className="glass-panel animate-fade-in" style={{ padding: '40px', textAlign: 'center' }}>
@@ -94,6 +94,17 @@ export default function DataTable({ data, onRowClick, isLoading, isRefreshingExc
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px' }}>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <input 
+                 type="checkbox" 
+                 checked={selectedTenders.some(t => t.id === item.id)}
+                 onChange={(e) => {
+                     e.stopPropagation();
+                     if (onToggleSelection) {
+                         onToggleSelection(item, e.target.checked);
+                     }
+                 }}
+                 style={{ transform: 'scale(1.3)', cursor: 'pointer', marginRight: '4px' }}
+              />
               <span style={{ fontSize: '0.8rem', background: 'rgba(255,255,255,0.1)', padding: '4px 8px', borderRadius: '4px' }}>
                 ID: {item.id}
               </span>

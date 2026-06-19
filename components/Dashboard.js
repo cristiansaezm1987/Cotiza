@@ -8,10 +8,23 @@ import DetailModal from './DetailModal';
 import RecommendationsPanel from './RecommendationsPanel';
 import Top20View from './Top20View';
 import MarketIntelligenceView from './MarketIntelligenceView';
+import PostulationsView from './PostulationsView';
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('explorer');
   const [data, setData] = useState([]);
+  const [selectedTenders, setSelectedTenders] = useState([]);
+
+  const handleToggleSelection = (tender, isSelected) => {
+      setSelectedTenders(prev => {
+          if (isSelected) {
+              if (!prev.some(t => t.id === tender.id)) return [...prev, tender];
+              return prev;
+          } else {
+              return prev.filter(t => t.id !== tender.id);
+          }
+      });
+  };
   const [filteredData, setFilteredData] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isBackgroundLoading, setIsBackgroundLoading] = useState(false);
@@ -424,15 +437,27 @@ export default function Dashboard() {
               <Activity size={18} /> Sugeridas (2do Llamado)
           </button>
           <button
-              onClick={() => setActiveTab('intelligence')}
+              onClick={() => setActiveTab('historical')}
               style={{
                   padding: '12px 24px', borderRadius: '8px', border: 'none', cursor: 'pointer',
                   display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', transition: '0.2s',
-                  background: activeTab === 'intelligence' ? '#10b981' : 'rgba(255,255,255,0.05)',
-                  color: activeTab === 'intelligence' ? 'white' : 'var(--text-secondary)'
+                  background: activeTab === 'historical' ? 'var(--primary-color)' : 'rgba(255,255,255,0.05)',
+                  color: activeTab === 'historical' ? 'white' : 'var(--text-secondary)'
               }}
           >
               <BookOpen size={18} /> Inteligencia Histórica
+          </button>
+          
+          <button
+              onClick={() => setActiveTab('postulations')}
+              style={{
+                  padding: '12px 24px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', transition: '0.2s',
+                  background: activeTab === 'postulations' ? 'var(--primary-color)' : 'rgba(255,255,255,0.05)',
+                  color: activeTab === 'postulations' ? 'white' : 'var(--text-secondary)'
+              }}
+          >
+              <CheckCircle size={18} /> Postulaciones ({selectedTenders.length})
           </button>
           <button
               onClick={() => setActiveTab('submitted')}
@@ -554,7 +579,7 @@ export default function Dashboard() {
   
 
 
-      {activeTab === 'intelligence' && (
+      {activeTab === 'historical' && (
           <MarketIntelligenceView />
       )}
 
@@ -567,7 +592,9 @@ export default function Dashboard() {
                  data={filteredData} 
                  onRowClick={setSelectedItem} 
                  isLoading={isLoading} 
-                 isRefreshingExcel={syncStatus.excel?.active}
+                 isRefreshingExcel={syncStatus.excel.active}
+                 selectedTenders={selectedTenders}
+                 onToggleSelection={handleToggleSelection}
               />
               
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
@@ -643,8 +670,8 @@ export default function Dashboard() {
       )}
 
       {(activeTab === 'suggested-1' || activeTab === 'suggested-2') && (
-          <>
-              <div style={{ marginBottom: '15px' }}>
+          <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
+              <div style={{ flex: '0 0 250px' }}>
                  <Filters filters={filters} setFilters={setFilters} />
               </div>
               <Top20View 
@@ -655,8 +682,17 @@ export default function Dashboard() {
                      return true;
                  })} 
                  filters={filters} 
+                 selectedTenders={selectedTenders}
+                 onToggleSelection={handleToggleSelection}
               />
-          </>
+          </div>
+      )}
+      
+      {activeTab === 'postulations' && (
+          <PostulationsView 
+              selectedTenders={selectedTenders} 
+              onToggleSelection={handleToggleSelection} 
+          />
       )}
 
       {activeTab === 'submitted' && (

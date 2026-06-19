@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Target, TrendingUp, AlertTriangle, CheckCircle, Package, DollarSign, Calendar, MapPin, Building2, Zap } from 'lucide-react';
 import DetailModal from './DetailModal';
 
-export default function Top20View({ data, filters }) {
+export default function Top20View({ data, filters, selectedTenders = [], onToggleSelection }) {
   const [selectedItem, setSelectedItem] = useState(null);
 
   const [page, setPage] = useState(1);
@@ -96,8 +96,19 @@ export default function Top20View({ data, filters }) {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px' }}>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input 
+                   type="checkbox" 
+                   checked={selectedTenders.some(t => t.id === item.id)}
+                   onChange={(e) => {
+                       e.stopPropagation();
+                       if (onToggleSelection) {
+                           onToggleSelection(item, e.target.checked);
+                       }
+                   }}
+                   style={{ transform: 'scale(1.3)', cursor: 'pointer', marginRight: '4px' }}
+                />
                 <span style={{ fontSize: '1.2rem', fontWeight: 800, color: index < 3 ? '#f59e0b' : 'var(--text-secondary)' }}>
-                  #{index + 1}
+                  #{index + 1 + (page - 1) * PAGE_SIZE}
                 </span>
                 <span style={{ fontSize: '0.8rem', background: 'rgba(255,255,255,0.1)', padding: '4px 8px', borderRadius: '4px' }}>
                   {item.id}
