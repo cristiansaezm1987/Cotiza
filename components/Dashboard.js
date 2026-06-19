@@ -82,18 +82,7 @@ export default function Dashboard() {
       return () => window.removeEventListener('syncFinished', handleSyncFinished);
   }, []);
 
-  // Also auto-refresh every 30 seconds if a sync is active so user sees progress
-  useEffect(() => {
-      let interval;
-      if (syncStatus.full.active || syncStatus.incremental.active) {
-          interval = setInterval(() => {
-              window.dispatchEvent(new Event('syncFinished'));
-          }, 30000);
-      }
-      return () => {
-          if (interval) clearInterval(interval);
-      };
-  }, [syncStatus.full.active, syncStatus.incremental.active]);
+
 
   // Sync Automática cada 1 Hora
   useEffect(() => {
@@ -200,88 +189,18 @@ export default function Dashboard() {
       const queueInterval = setInterval(processVettingQueue, 2000);
       return () => clearInterval(queueInterval);
   }, []);
-
-  const fetchAllRemainingPages = async (startPage, totalPages, accumulatedData) => {
-    setIsBackgroundLoading(true);
-    let currentData = [...accumulatedData];
-    
-    const BATCH_SIZE = 2;
-    let p = startPage;
-    
-    while (p <= totalPages) {
-      if (isSyncPausedRef.current) {
-        await new Promise(r => setTimeout(r, 500));
-        continue;
-      }
-      
-      try {
-        const promises = [];
-        for (let i = 0; i < BATCH_SIZE && (p + i) <= totalPages; i++) {
-          const fetchWithRetry = async (pageNum) => {
-            for (let attempt = 1; attempt <= 3; attempt++) {
-              try {
-                const r = await fetch(`/api/scrape?page=${pageNum}`);
-                const json = await r.json();
-                if (json && json.success) return json;
-                throw new Error('No data or success flag missing');
-              } catch (e) {
-                if (attempt === 3) return null;
-                await new Promise(res => setTimeout(res, 2000 * attempt));
-              }
-            }
-            return null;
-          };
-          promises.push(fetchWithRetry(p + i));
-        }
-        
-        const results = await Promise.all(promises);
-        
-        setBackgroundProgress({ current: Math.min(p + BATCH_SIZE - 1, totalPages), total: totalPages });
-        
-        let batchHasData = false;
-        
-        for (let result of results) {
-          if (result && result.success && result.data) {
-            currentData = [...currentData, ...result.data];
-            batchHasData = true;
-            
-            result.data.forEach(item => {
-                if (processedIdsRef.current.has(item.id)) return;
-                processedIdsRef.current.add(item.id);
-                const scoredItem = calculateBiScore(item);
-                if (scoredItem.biScore >= 0) {
-                    vettingQueueRef.current.push(scoredItem);
-                }
-            });
-            vettingQueueRef.current.sort((a,b) => b.biScore - a.biScore);
-          }
-        }
-        
-        if (batchHasData) setData(currentData);
-        
-      } catch (e) {
-        console.error('Error in background batch fetching:', e);
-      }
-      
-      p += BATCH_SIZE;
-    }
-    
-    setIsBackgroundLoading(false);
-  };
-
   const fetchData = async () => {
     if (data.length === 0) setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/scrape?page=1`);
+      const res = await fetch(`/api/data-all`);
       const result = await res.json();
       
       if (!result.success) {
         setError(result.error || 'Error al conectar con el servidor.');
-        setIsLoading(false);
         return;
       }
-
+      
       const newData = result.data || [];
       const newTotal = result.totalCount || 0;
       
@@ -296,14 +215,14 @@ export default function Dashboard() {
           }
       });
       vettingQueueRef.current.sort((a,b) => b.biScore - a.biScore);
-
-      const totalPages = Math.ceil(newTotal / 15);
-      if (totalPages > 1) {
-        fetchAllRemainingPages(2, totalPages, newData);
+      
+      // Auto-trigger vetting queue processor
+      if (!isVettingRef.current && vettingQueueRef.current.length > 0) {
+          // It will be picked up by the vetting useEffect
       }
-
+      
     } catch (err) {
-      setError('Error al conectar con el servidor.');
+      setError(err.message || 'Error de red.');
     } finally {
       setIsLoading(false);
     }
