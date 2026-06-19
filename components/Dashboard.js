@@ -166,50 +166,55 @@ export default function Dashboard() {
           isVettingRef.current = true;
           
           while (vettingQueueRef.current.length > 0) {
-              const candidate = vettingQueueRef.current.shift();
-              let finalScore = candidate.biScore;
-              let finalReasons = [...candidate.biReasons];
-              let descPreview = '';
+              const batch = vettingQueueRef.current.splice(0, 10);
+              
+              const promises = batch.map(async (candidate) => {
+                  let finalScore = candidate.biScore;
+                  let finalReasons = [...candidate.biReasons];
+                  let descPreview = '';
 
-              try {
-                  const res = await fetch(`/api/scrape-detail?id=${candidate.id}`);
-                  const json = await res.json();
-                  let passedDeepVetting = false;
+                  try {
+                      const res = await fetch(`/api/scrape-detail?id=${candidate.id}`);
+                      const json = await res.json();
+                      let passedDeepVetting = false;
 
-                  if (json.success && json.data) {
-                      const descLower = (json.data.descripcion || '').toLowerCase();
-                      const COMPLEX_DESC = ['anexo', 'adjunto', 'archivo adjunto', 'ver archivo', 'ver anexo', 'ver detalle adjunto', 'según anexo', 'segun anexo', 'según especificaciones', 'bases adjuntas'];
-                      if (descLower.length >= 20 && !COMPLEX_DESC.some(kw => descLower.includes(kw))) {
-                          finalReasons.push('100% Simple (Sin Anexos)');
-                          descPreview = json.data.descripcion;
-                          passedDeepVetting = true;
+                      if (json.success && json.data) {
+                          const descLower = (json.data.descripcion || '').toLowerCase();
+                          const COMPLEX_DESC = ['anexo', 'adjunto', 'archivo adjunto', 'ver archivo', 'ver anexo', 'ver detalle adjunto', 'según anexo', 'segun anexo', 'según especificaciones', 'bases adjuntas'];
+                          if (descLower.length >= 20 && !COMPLEX_DESC.some(kw => descLower.includes(kw))) {
+                              finalReasons.push('100% Simple (Sin Anexos)');
+                              descPreview = json.data.descripcion;
+                              passedDeepVetting = true;
+                          }
                       }
-                  }
 
-                  if (!passedDeepVetting) {
-                      finalScore = -1;
-                  } else {
-                      candidate.biReasons = finalReasons;
-                      candidate.descriptionPreview = descPreview;
-                      setVettedData(prev => {
-                          if (prev.some(p => p.id === candidate.id)) return prev;
-                          return [...prev, candidate].sort((a,b) => b.biScore - a.biScore);
+                      if (!passedDeepVetting) {
+                          finalScore = -1;
+                      } else {
+                          candidate.biReasons = finalReasons;
+                          candidate.descriptionPreview = descPreview;
+                          setVettedData(prev => {
+                              if (prev.some(p => p.id === candidate.id)) return prev;
+                              return [...prev, candidate].sort((a,b) => b.biScore - a.biScore);
+                          });
+                      }
+
+                      await fetch('/api/vetting/save', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                              id: candidate.id,
+                              isVetted: 1,
+                              biScore: finalScore,
+                              biReasons: finalReasons,
+                              descriptionPreview: descPreview
+                          })
                       });
-                  }
+                  } catch (e) { console.error('Vetting Error', e); }
+              });
 
-                  await fetch('/api/vetting/save', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                          id: candidate.id,
-                          isVetted: 1,
-                          biScore: finalScore,
-                          biReasons: finalReasons,
-                          descriptionPreview: descPreview
-                      })
-                  });
-              } catch (e) { console.error('Vetting Error', e); }
-              setVettingProgress(prev => ({ ...prev, current: prev.current + 1 }));
+              await Promise.all(promises);
+              setVettingProgress(prev => ({ ...prev, current: prev.current + batch.length }));
           }
           isVettingRef.current = false;
       };
