@@ -5,32 +5,45 @@ import 'jspdf-autotable';
 
 export default function PostulationsView({ selectedTenders, onToggleSelection }) {
   const [drafts, setDrafts] = useState({});
+  const debounceRef = React.useRef({});
 
   // Initialize drafts for newly selected tenders
   useEffect(() => {
     const newDrafts = { ...drafts };
     selectedTenders.forEach(t => {
       if (!newDrafts[t.id]) {
-        newDrafts[t.id] = {
-          productCost: '',
-          supplierLink: '',
-          shippingCost: '',
-          margin: 30, // Default 30% margin
-          validityDays: 30
-        };
+        newDrafts[t.id] = t.postulationDraft && Object.keys(t.postulationDraft).length > 0 
+          ? t.postulationDraft 
+          : {
+              productCost: '',
+              supplierLink: '',
+              shippingCost: '',
+              margin: 30, // Default 30% margin
+              validityDays: 30
+            };
       }
     });
     setDrafts(newDrafts);
   }, [selectedTenders]);
 
   const updateDraft = (id, field, value) => {
-    setDrafts(prev => ({
-      ...prev,
-      [id]: {
-        ...prev[id],
-        [field]: value
-      }
-    }));
+    setDrafts(prev => {
+      const newDraft = { ...prev[id], [field]: value };
+      
+      if (debounceRef.current[id]) clearTimeout(debounceRef.current[id]);
+      debounceRef.current[id] = setTimeout(() => {
+          fetch('/api/postulations/save', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id, isPostulated: true, draft: newDraft })
+          }).catch(console.error);
+      }, 1000);
+
+      return {
+        ...prev,
+        [id]: newDraft
+      };
+    });
   };
 
   const calculateFinal = (draft) => {

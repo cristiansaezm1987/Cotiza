@@ -24,9 +24,26 @@ export default function Dashboard() {
               return prev.filter(t => t.id !== tender.id);
           }
       });
+      fetch('/api/postulations/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: tender.id, isPostulated: isSelected })
+      }).catch(console.error);
   };
   const [filteredData, setFilteredData] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+      // Load initial postulations
+      fetch('/api/postulations')
+          .then(res => res.json())
+          .then(data => {
+             if (data.success && data.data) {
+                 setSelectedTenders(data.data);
+             }
+          })
+          .catch(console.error);
+  }, []);
   const [isBackgroundLoading, setIsBackgroundLoading] = useState(false);
   const [backgroundProgress, setBackgroundProgress] = useState({ current: 0, total: 0 });
   const [isSyncPaused, setIsSyncPaused] = useState(false);
