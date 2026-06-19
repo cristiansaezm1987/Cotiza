@@ -97,6 +97,7 @@ export default function Dashboard() {
   const vettingQueueRef = useRef([]);
   const isVettingRef = useRef(false);
   const processedIdsRef = useRef(new Set());
+  const [vettingProgress, setVettingProgress] = useState({ current: 0, total: 0 });
 
   const [filters, setFilters] = useState({
     search: '',
@@ -182,6 +183,7 @@ export default function Dashboard() {
                       }
                   }
               } catch (e) { console.error('Vetting Error', e); }
+              setVettingProgress(prev => ({ ...prev, current: prev.current + 1 }));
           }
           isVettingRef.current = false;
       };
@@ -215,6 +217,7 @@ export default function Dashboard() {
           }
       });
       vettingQueueRef.current.sort((a,b) => b.biScore - a.biScore);
+      setVettingProgress({ current: 0, total: vettingQueueRef.current.length });
       
       // Auto-trigger vetting queue processor
       if (!isVettingRef.current && vettingQueueRef.current.length > 0) {
@@ -318,6 +321,23 @@ export default function Dashboard() {
           {error && <span style={{ color: 'var(--danger-color)', fontSize: '0.9rem' }}>{error}</span>}
         </div>
       </div>
+      
+      {vettingProgress.total > 0 && vettingProgress.current < vettingProgress.total && (
+        <div style={{ background: 'rgba(139, 92, 246, 0.1)', border: '1px solid #8b5cf6', padding: '15px', borderRadius: '12px', marginTop: '5px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.85rem', color: '#a78bfa', fontWeight: 'bold' }}>
+            <span>Analizando y puntuando licitaciones en segundo plano (Inteligencia)...</span>
+            <span>{vettingProgress.current} / {vettingProgress.total} ({Math.round((vettingProgress.current / vettingProgress.total) * 100)}%)</span>
+          </div>
+          <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+            <div style={{ 
+              height: '100%', 
+              width: `${(vettingProgress.current / vettingProgress.total) * 100}%`, 
+              background: 'linear-gradient(90deg, #8b5cf6, #d946ef)',
+              transition: 'width 0.3s ease'
+            }} />
+          </div>
+        </div>
+      )}
       
       <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
           <button
