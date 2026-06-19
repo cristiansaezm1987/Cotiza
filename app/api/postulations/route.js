@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { openDB } from '../../../lib/db';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request) {
   try {
     const db = await openDB();
