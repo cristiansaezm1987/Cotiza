@@ -29,7 +29,7 @@ const IntelligentWidget = ({ tender, onUpdateQuoter }) => {
                 let initialQueries = {};
                 let queriesList = [];
                 
-                const cacheKey = `ai_keywords_v2_${tender.id}`;
+                const cacheKey = `ai_keywords_v3_${tender.id}`;
                 const cached = localStorage.getItem(cacheKey);
                 
                 try {
@@ -53,10 +53,13 @@ const IntelligentWidget = ({ tender, onUpdateQuoter }) => {
                     }
                 } catch (aiErr) {
                     console.error("Fallback to basic names", aiErr);
-                    setAiError("Límite de IA alcanzado (Espera 1 min). Usando nombres originales.");
+                    setAiError("Límite de IA alcanzado (Espera 1 min). Usando descripción/nombres originales.");
                     fetchedItems.forEach((i, idx) => {
-                        initialQueries[idx] = i.nombre;
-                        queriesList.push(i.nombre);
+                        let query = i.descripcion && i.descripcion.trim().length > 0 && i.descripcion.trim().length < 50 ? i.descripcion.trim() : i.nombre;
+                        // Clean up typical garbage from description
+                        query = query.replace(/\n/g, ' ').replace(/\r/g, '').replace(/  +/g, ' ').trim();
+                        initialQueries[idx] = query;
+                        queriesList.push(query);
                     });
                 }
                 setIsAnalyzingAI(false);
