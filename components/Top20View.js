@@ -246,7 +246,12 @@ export default function Top20View({ data, filters, selectedTenders = [], onToggl
       )}
 
       {selectedItem && (
-        <DetailModal item={selectedItem} onClose={() => setSelectedItem(null)} />
+        <DetailModal 
+            item={selectedItem} 
+            isSelected={selectedTenders.some(t => t.id === selectedItem.id)}
+            onToggleSelection={onToggleSelection}
+            onClose={() => setSelectedItem(null)} 
+        />
       )}
     </div>
   );
