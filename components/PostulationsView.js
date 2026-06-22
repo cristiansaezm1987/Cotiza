@@ -28,18 +28,28 @@ const IntelligentWidget = ({ tender, onUpdateQuoter }) => {
                 setIsAnalyzingAI(true);
                 let initialQueries = {};
                 let queriesList = [];
+                
+                const cacheKey = `ai_keywords_${tender.id}`;
+                const cached = localStorage.getItem(cacheKey);
+                
                 try {
-                    const aiRes = await fetch('/api/intelligence/extract-item-keywords', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ tenderName: tender.name, items: fetchedItems })
-                    });
-                    const aiData = await aiRes.json();
-                    if (aiData.success && aiData.data) {
-                        initialQueries = aiData.data;
+                    if (cached) {
+                        initialQueries = JSON.parse(cached);
                         queriesList = fetchedItems.map((_, idx) => initialQueries[idx] || fetchedItems[idx].nombre);
                     } else {
-                        throw new Error("AI extraction failed");
+                        const aiRes = await fetch('/api/intelligence/extract-item-keywords', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ tenderName: tender.name, items: fetchedItems })
+                        });
+                        const aiData = await aiRes.json();
+                        if (aiData.success && aiData.data) {
+                            initialQueries = aiData.data;
+                            queriesList = fetchedItems.map((_, idx) => initialQueries[idx] || fetchedItems[idx].nombre);
+                            localStorage.setItem(cacheKey, JSON.stringify(initialQueries));
+                        } else {
+                            throw new Error("AI extraction failed");
+                        }
                     }
                 } catch (aiErr) {
                     console.error("Fallback to basic names", aiErr);
