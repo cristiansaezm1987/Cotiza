@@ -333,7 +333,14 @@ export default function PostulationsView({ selectedTenders, onToggleSelection, o
                         <Copy size={14} />
                     </button>
                 </div>
-                <h4 style={{ margin: '8px 0 4px', fontSize: '1rem', lineHeight: '1.3' }}>{tender.name}</h4>
+                <h4 
+                    onClick={() => onOpenDetail && onOpenDetail(tender)}
+                    style={{ margin: '8px 0 4px', fontSize: '1rem', lineHeight: '1.3', cursor: 'pointer', transition: 'color 0.2s' }}
+                    onMouseEnter={(e) => e.target.style.color = '#60a5fa'}
+                    onMouseLeave={(e) => e.target.style.color = 'var(--text-primary)'}
+                >
+                    {tender.name}
+                </h4>
                 <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{tender.organization}</p>
                 <button
                     onClick={() => setExpandedQuoters(prev => ({...prev, [tender.id]: !prev[tender.id]}))}
