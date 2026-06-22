@@ -11,6 +11,7 @@ const IntelligentWidget = ({ tender, onUpdateQuoter }) => {
     const [queries, setQueries] = useState({});
     const [isSearchingMeli, setIsSearchingMeli] = useState({});
     const [isAnalyzingAI, setIsAnalyzingAI] = useState(false);
+    const [aiError, setAiError] = useState(null);
 
 
     
@@ -42,6 +43,7 @@ const IntelligentWidget = ({ tender, onUpdateQuoter }) => {
                     }
                 } catch (aiErr) {
                     console.error("Fallback to basic names", aiErr);
+                    setAiError("Límite de IA alcanzado (Espera 1 min). Usando nombres originales.");
                     fetchedItems.forEach((i, idx) => {
                         initialQueries[idx] = i.nombre;
                         queriesList.push(i.nombre);
@@ -111,7 +113,10 @@ const IntelligentWidget = ({ tender, onUpdateQuoter }) => {
 
     return (
         <div className="animate-fade-in" style={{background: 'linear-gradient(180deg, rgba(59, 130, 246, 0.15) 0%, rgba(139, 92, 246, 0.1) 100%)', border: '1px solid #3b82f6', borderRadius: '8px', padding: '15px', marginTop: '10px'}}>
-            <h5 style={{margin: '0 0 15px 0', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '8px'}}><Calculator size={16}/> Sugerencias de Productos (Autollenado)</h5>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px'}}>
+                <h5 style={{margin: 0, color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '8px'}}><Calculator size={16}/> Sugerencias de Productos (Autollenado)</h5>
+                {aiError && <span style={{fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.2)', color: '#fca5a5', padding: '4px 8px', borderRadius: '4px', border: '1px solid #ef4444'}}>{aiError}</span>}
+            </div>
             {items.map((item, idx) => (
                 <div key={idx} style={{marginBottom: '15px', background: 'rgba(0,0,0,0.3)', padding: '12px', borderRadius: '8px', borderLeft: '3px solid #8b5cf6'}}>
                     <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px'}}>
