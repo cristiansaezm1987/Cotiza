@@ -11,29 +11,27 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Falta el parámetro de búsqueda (q)' }, { status: 400 });
     }
 
-    const res = await fetch(`https://api.mercadolibre.com/sites/MLC/search?q=${encodeURIComponent(query)}&limit=10`, {
-        headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        }
-    });
+    const res = await fetch(`http://127.0.0.1:8000/api/search/?q=${encodeURIComponent(query)}`);
     
     if (!res.ok) {
-        console.error(`ML API error for query ${query}: ${res.status}`);
-        return NextResponse.json({ success: false, error: 'Error en API de Mercado Libre' }, { status: res.status });
+        console.error(`Django API error for query ${query}: ${res.status}`);
+        return NextResponse.json({ success: false, error: 'Error en Django Backend' }, { status: res.status });
     }
 
     const data = await res.json();
-    const results = (data.results || []).map(item => ({
-        id: item.id,
+    
+    // El backend de Django devuelve { meli_results: [...], other_results: [...] }
+    const results = (data.meli_results || []).map(item => ({
+        id: `django-${Math.random()}`,
         title: item.title,
-        description: 'Encontrado en Mercado Libre',
+        description: item.raw_shipping || 'Encontrado por MeliPulse Django',
         price: item.price || 0,
-        currency: item.currency_id || 'CLP',
-        thumbnail: item.thumbnail ? item.thumbnail.replace('http://', 'https://') : 'https://http2.mlstatic.com/frontend-assets/ui-navigation/5.19.1/mercadolibre/logo__small.png',
+        currency: item.currency || 'CLP',
+        thumbnail: item.image || 'https://http2.mlstatic.com/frontend-assets/ui-navigation/5.19.1/mercadolibre/logo__small.png',
         permalink: item.permalink,
-        condition: item.condition,
-        shipping: item.shipping?.free_shipping ? 'Envío gratis' : 'Calculado',
-        source: 'MercadoLibre API'
+        condition: 'new',
+        shipping: item.free_shipping ? 'Envío gratis' : 'Calculado',
+        source: 'MeliPulse Django'
     }));
 
     return NextResponse.json({ success: true, results });
