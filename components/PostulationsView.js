@@ -10,20 +10,9 @@ const IntelligentWidget = ({ tender, onUpdateQuoter }) => {
     const [selectedMap, setSelectedMap] = useState({});
     const [queries, setQueries] = useState({});
     const [isSearchingMeli, setIsSearchingMeli] = useState({});
+    const [isAnalyzingAI, setIsAnalyzingAI] = useState(false);
 
-    const extractHeuristicKeyword = (tenderName, itemName, itemDesc) => {
-        const combined = `${tenderName} ${itemName} ${itemDesc || ''}`.toUpperCase();
-        const products = ["UPS", "NOTEBOOK", "LAPTOP", "IMPRESORA", "TONER", "TINTA", "PAPEL", "DISCO DURO", "SSD", "MEMORIA", "MONITOR", "CABLE", "ROUTER", "SWITCH", "SERVIDOR", "TECLADO", "MOUSE"];
-        let mainProduct = products.find(p => combined.includes(p));
-        
-        if (mainProduct) {
-            const specs = combined.match(/\b\d+(W|V|VA|GB|TB|MB|GHZ|HZ|AH|RPM)\b/g);
-            let query = mainProduct;
-            if (specs) query += " " + Array.from(new Set(specs)).slice(0, 2).join(" ");
-            return query;
-        }
-        return itemName;
-    };
+
     
     useEffect(() => {
         async function init() {
@@ -35,12 +24,30 @@ const IntelligentWidget = ({ tender, onUpdateQuoter }) => {
                 if (fetchedItems.length === 0) fetchedItems = [{nombre: data.data?.nombre || tender.name}];
                 setItems(fetchedItems);
                 
-                const initialQueries = {};
-                const queriesList = fetchedItems.map((i, idx) => {
-                    const q = extractHeuristicKeyword(tender.name, i.nombre, i.descripcion);
-                    initialQueries[idx] = q;
-                    return q;
-                });
+                setIsAnalyzingAI(true);
+                let initialQueries = {};
+                let queriesList = [];
+                try {
+                    const aiRes = await fetch('/api/intelligence/extract-item-keywords', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ tenderName: tender.name, items: fetchedItems })
+                    });
+                    const aiData = await aiRes.json();
+                    if (aiData.success && aiData.data) {
+                        initialQueries = aiData.data;
+                        queriesList = fetchedItems.map((_, idx) => initialQueries[idx] || fetchedItems[idx].nombre);
+                    } else {
+                        throw new Error("AI extraction failed");
+                    }
+                } catch (aiErr) {
+                    console.error("Fallback to basic names", aiErr);
+                    fetchedItems.forEach((i, idx) => {
+                        initialQueries[idx] = i.nombre;
+                        queriesList.push(i.nombre);
+                    });
+                }
+                setIsAnalyzingAI(false);
                 setQueries(initialQueries);
                 
                 const mlRes = await fetch(`/api/mercadolibre-bulk`, {
@@ -95,10 +102,10 @@ const IntelligentWidget = ({ tender, onUpdateQuoter }) => {
         setIsSearchingMeli(prev => ({...prev, [idx]: false}));
     };
 
-    if (loading) return (
+    if (loading || isAnalyzingAI) return (
         <div style={{background: 'rgba(59, 130, 246, 0.1)', border: '1px solid #3b82f6', borderRadius: '8px', padding: '20px', marginTop: '10px', textAlign: 'center'}}>
             <div style={{width: '30px', height: '30px', border: '3px solid rgba(59, 130, 246, 0.3)', borderTopColor: '#3b82f6', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 10px'}}></div>
-            <p style={{color: '#60a5fa', margin: 0}}>Analizando licitación y buscando en MeliPulse...</p>
+            <p style={{color: '#60a5fa', margin: 0}}>{isAnalyzingAI ? '🤖 Analizando con IA (buscando productos exactos)...' : 'Recopilando datos de Licitación...'}</p>
         </div>
     );
 
@@ -377,7 +384,6 @@ export default function PostulationsView({ selectedTenders, onToggleSelection, o
                         style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '8px', borderRadius: '4px' }}
                     />
                 </div>
-                
                 <div style={{ gridColumn: '1 / -1' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>
                         <ExternalLink size={14} /> Enlace del Proveedor (Guardado Interno)
