@@ -115,13 +115,33 @@ export default function Dashboard() {
 
 
 
-  // Sync Automática cada 1 Hora
+  // Sync Automática inteligente
   useEffect(() => {
+    const checkAndSync = () => {
+      if (!dbStats || !dbStats.base1 || !dbStats.base1.newestDate) return;
+      const lastUpdateStr = dbStats.base1.newestDate; // e.g. "2026-06-19 14:59"
+      try {
+        const parts = lastUpdateStr.match(/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})/);
+        if (parts) {
+            const lastUpdateMs = new Date(`${parts[1]}-${parts[2]}-${parts[3]}T${parts[4]}:${parts[5]}:00-04:00`).getTime();
+            if (Date.now() - lastUpdateMs > 60 * 60 * 1000) {
+                console.log("Data is older than 1 hour. Triggering auto-sync on load...");
+                fetch('/api/sync/incremental').catch(e => console.error('Auto sync error:', e));
+            }
+        }
+      } catch (e) {}
+    };
+
+    // Check once on mount (when dbStats loads)
+    if (dbStats && dbStats.base1) {
+        checkAndSync();
+    }
+
     const autoSyncInterval = setInterval(() => {
       fetch('/api/sync/incremental').catch(e => console.error('Auto sync error:', e));
     }, 60 * 60 * 1000); // 1 hora
     return () => clearInterval(autoSyncInterval);
-  }, []);
+  }, [dbStats]);
 
   // Background Vetting State
   const [vettedData, setVettedData] = useState([]);
