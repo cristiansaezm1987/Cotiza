@@ -15,7 +15,11 @@ export async function POST(request) {
     // Ejecutamos las búsquedas en paralelo usando Promise.all para mayor velocidad
     const searchPromises = queries.map(async (query, index) => {
         try {
-            const res = await fetch(`https://api.mercadolibre.com/sites/MLC/search?q=${encodeURIComponent(query)}&limit=3`);
+            const res = await fetch(`https://api.mercadolibre.com/sites/MLC/search?q=${encodeURIComponent(query)}&limit=3`, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                }
+            });
             
             if (!res.ok) {
                 console.error(`ML API error for query ${query}: ${res.status}`);

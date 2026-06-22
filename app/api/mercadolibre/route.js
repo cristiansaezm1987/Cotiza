@@ -11,7 +11,11 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Falta el parámetro de búsqueda (q)' }, { status: 400 });
     }
 
-    const res = await fetch(`https://api.mercadolibre.com/sites/MLC/search?q=${encodeURIComponent(query)}&limit=10`);
+    const res = await fetch(`https://api.mercadolibre.com/sites/MLC/search?q=${encodeURIComponent(query)}&limit=10`, {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+    });
     
     if (!res.ok) {
         console.error(`ML API error for query ${query}: ${res.status}`);

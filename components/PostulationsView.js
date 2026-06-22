@@ -29,7 +29,7 @@ const IntelligentWidget = ({ tender, onUpdateQuoter }) => {
                 let initialQueries = {};
                 let queriesList = [];
                 
-                const cacheKey = `ai_keywords_${tender.id}`;
+                const cacheKey = `ai_keywords_v2_${tender.id}`;
                 const cached = localStorage.getItem(cacheKey);
                 
                 try {
