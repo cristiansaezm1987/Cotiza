@@ -4,11 +4,13 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 const IntelligentWidget = ({ tender, onUpdateQuoter }) => {
-    const [loading, setLoading] = useState(true);
     const [items, setItems] = useState([]);
-    const [meliResultsMap, setMeliResultsMap] = useState({});
-    const [selectedMap, setSelectedMap] = useState({});
     const [queries, setQueries] = useState({});
+    const [meliResultsMap, setMeliResultsMap] = useState({});
+    const [loading, setLoading] = useState(true);
+    const [selectedMap, setSelectedMap] = useState({});
+    const [customInputs, setCustomInputs] = useState({});
+    const [margins, setMargins] = useState({});
     const [isSearchingMeli, setIsSearchingMeli] = useState({});
     const [isAnalyzingAI, setIsAnalyzingAI] = useState(false);
     const [aiError, setAiError] = useState(null);
@@ -82,20 +84,61 @@ const IntelligentWidget = ({ tender, onUpdateQuoter }) => {
         init();
     }, [tender.id]);
 
-    const handleSelect = (idx, prod) => {
-        const newSelected = { ...selectedMap, [idx]: prod };
-        setSelectedMap(newSelected);
+    useEffect(() => {
+        let totalCost = 0;
+        let totalMargin = 0;
+        let finalPrice = 0;
+        let itemsData = [];
         
-        let sum = 0;
-        let links = [];
-        items.forEach((_, i) => {
-            if (newSelected[i]) {
-                const qty = Number(items[i]?.cantidad) || 1;
-                sum += newSelected[i].price * qty;
-                links.push(newSelected[i].permalink);
+        items.forEach((item, idx) => {
+            const qty = Number(item.cantidad) || 1;
+            const custom = customInputs[idx] || {};
+            const selected = selectedMap[idx];
+            
+            let cost = 0;
+            let title = '';
+            let link = '';
+            
+            if (custom.price && custom.price > 0) {
+                cost = Number(custom.price);
+                title = custom.title || 'Producto Manual';
+                link = custom.link || '';
+            } else if (selected) {
+                cost = selected.price;
+                title = selected.title;
+                link = selected.permalink;
             }
+            
+            const marginPct = margins[idx] !== undefined ? margins[idx] : 30; // default 30%
+            const itemMarginVal = cost * (marginPct / 100);
+            const itemFinal = cost + itemMarginVal;
+            
+            totalCost += (cost * qty);
+            totalMargin += (itemMarginVal * qty);
+            finalPrice += (itemFinal * qty);
+            
+            itemsData.push({
+                idx,
+                nombre: item.nombre,
+                descripcion: item.descripcion,
+                qty,
+                selectedTitle: title,
+                link,
+                unitCost: cost,
+                marginPct,
+                unitMarginVal: itemMarginVal,
+                unitFinalPrice: itemFinal,
+                totalFinalPrice: itemFinal * qty
+            });
         });
-        onUpdateQuoter(sum, links.join('\n'));
+        
+        onUpdateQuoter({ totalCost, totalMargin, finalPrice, itemsData });
+    }, [items, selectedMap, customInputs, margins]);
+
+    const handleSelect = (idx, prod) => {
+        setSelectedMap(prev => ({ ...prev, [idx]: prod }));
+        // Clear custom input if they select a suggested product
+        setCustomInputs(prev => ({ ...prev, [idx]: { ...prev[idx], price: '' } }));
     };
 
     const handleManualSearch = async (idx) => {
@@ -116,6 +159,30 @@ const IntelligentWidget = ({ tender, onUpdateQuoter }) => {
         }
         setIsSearchingMeli(prev => ({...prev, [idx]: false}));
     };
+
+    let renderTotalCost = 0;
+    let renderTotalMargin = 0;
+    let renderFinalPrice = 0;
+    
+    items.forEach((item, idx) => {
+        const qty = Number(item.cantidad) || 1;
+        const custom = customInputs[idx] || {};
+        const selected = selectedMap[idx];
+        let cost = 0;
+        
+        if (custom.price && custom.price > 0) {
+            cost = Number(custom.price);
+        } else if (selected) {
+            cost = selected.price;
+        }
+        
+        const marginPct = margins[idx] !== undefined ? margins[idx] : 30;
+        const itemMarginVal = cost * (marginPct / 100);
+        
+        renderTotalCost += (cost * qty);
+        renderTotalMargin += (itemMarginVal * qty);
+        renderFinalPrice += ((cost + itemMarginVal) * qty);
+    });
 
     if (loading || isAnalyzingAI) return (
         <div style={{background: 'rgba(59, 130, 246, 0.1)', border: '1px solid #3b82f6', borderRadius: '8px', padding: '20px', marginTop: '10px', textAlign: 'center'}}>
@@ -182,8 +249,61 @@ const IntelligentWidget = ({ tender, onUpdateQuoter }) => {
                             })}
                         </div>
                     )}
+                    
+                    <div style={{marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.1)'}}>
+                        <div style={{fontSize: '0.8rem', color: '#9ca3af', marginBottom: '5px'}}>O si prefieres, completa este ítem manualmente:</div>
+                        <div style={{display: 'flex', gap: '10px'}}>
+                            <input 
+                                type="text" 
+                                placeholder="Nombre/Link del Producto" 
+                                value={customInputs[idx]?.link || ''}
+                                onChange={e => {
+                                    const val = e.target.value;
+                                    setCustomInputs(prev => ({...prev, [idx]: {...prev[idx], link: val, title: val}}));
+                                    setSelectedMap(prev => { const n = {...prev}; delete n[idx]; return n; });
+                                }}
+                                style={{flex: 2, padding: '6px 10px', borderRadius: '4px', border: '1px solid #4b5563', background: 'rgba(0,0,0,0.5)', color: 'white', fontSize: '0.8rem'}}
+                            />
+                            <input 
+                                type="number" 
+                                placeholder="Costo Unitario $" 
+                                value={customInputs[idx]?.price || ''}
+                                onChange={e => {
+                                    setCustomInputs(prev => ({...prev, [idx]: {...prev[idx], price: e.target.value}}));
+                                    setSelectedMap(prev => { const n = {...prev}; delete n[idx]; return n; });
+                                }}
+                                style={{flex: 1, padding: '6px 10px', borderRadius: '4px', border: '1px solid #4b5563', background: 'rgba(0,0,0,0.5)', color: 'white', fontSize: '0.8rem'}}
+                            />
+                            <div style={{display: 'flex', alignItems: 'center', gap: '5px', flex: 1}}>
+                                <label style={{fontSize: '0.8rem', color: 'white'}}>Margen %</label>
+                                <input 
+                                    type="number" 
+                                    value={margins[idx] !== undefined ? margins[idx] : 30}
+                                    onChange={e => setMargins(prev => ({...prev, [idx]: Number(e.target.value)}))}
+                                    style={{width: '60px', padding: '6px', borderRadius: '4px', border: '1px solid #4b5563', background: 'rgba(0,0,0,0.5)', color: 'white', fontSize: '0.8rem'}}
+                                />
+                            </div>
+                        </div>
+                    </div>
                 </div>
             ))}
+            
+            <div style={{background: 'rgba(0,0,0,0.4)', borderRadius: '8px', padding: '15px', marginTop: '15px', border: '1px solid #4b5563'}}>
+                <h6 style={{color: 'white', margin: '0 0 10px', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '5px'}}><Calculator size={14}/> Resumen Motor Cotizador</h6>
+                <div style={{display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#9ca3af', marginBottom: '4px'}}>
+                    <span>Costo Base Total:</span>
+                    <span>${Math.round(renderTotalCost).toLocaleString('es-CL')}</span>
+                </div>
+                <div style={{display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#10b981', marginBottom: '8px'}}>
+                    <span>Margen Total Esperado:</span>
+                    <span>+ ${Math.round(renderTotalMargin).toLocaleString('es-CL')}</span>
+                </div>
+                <div style={{display: 'flex', justifyContent: 'space-between', fontSize: '1rem', color: 'white', fontWeight: 'bold', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '8px'}}>
+                    <span>Precio Final (Neto):</span>
+                    <span>${Math.round(renderFinalPrice).toLocaleString('es-CL')}</span>
+                </div>
+            </div>
+
             {Object.keys(selectedMap).length === items.length && (
                 <div style={{background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', padding: '10px', borderRadius: '6px', textAlign: 'center', fontWeight: 'bold', fontSize: '0.9rem'}}>
                     ¡Todos los ítems seleccionados! Costos y enlaces prellenados.
@@ -238,6 +358,22 @@ export default function PostulationsView({ selectedTenders, onToggleSelection, o
   };
 
   const calculateFinal = (draft) => {
+    // Si tenemos itemsData detallado desde el Motor Cotizador Inteligente
+    if (draft.itemsData && draft.itemsData.length > 0) {
+        let finalProduct = 0;
+        draft.itemsData.forEach(item => {
+            finalProduct += item.totalFinalPrice || 0;
+        });
+        
+        const sCost = Number(draft.shippingCost) || 0;
+        // El despacho usa un margen global genérico (30%) o el que tenga el draft
+        const globalMargin = (Number(draft.margin) || 30) / 100;
+        const finalShipping = Math.round(sCost * (1 + globalMargin));
+        
+        return { finalProduct, finalShipping, total: finalProduct + finalShipping };
+    }
+    
+    // Fallback: Lógica antigua global
     const pCost = Number(draft.productCost) || 0;
     const sCost = Number(draft.shippingCost) || 0;
     const m = (Number(draft.margin) || 0) / 100;
@@ -382,38 +518,53 @@ export default function PostulationsView({ selectedTenders, onToggleSelection, o
             {expandedQuoters[tender.id] && (
                 <IntelligentWidget 
                     tender={tender} 
-                    onUpdateQuoter={(sumCost, urls) => {
-                        updateDraft(tender.id, 'productCost', sumCost);
-                        updateDraft(tender.id, 'supplierLink', urls);
+                    onUpdateQuoter={(data) => {
+                        updateDraft(tender.id, 'itemsData', data.itemsData);
+                        updateDraft(tender.id, 'productCost', data.totalCost); // Solo para retrocompatibilidad
                     }} 
                 />
             )}
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', background: 'rgba(0,0,0,0.2)', padding: '15px', borderRadius: '8px' }}>
-                <div style={{ gridColumn: '1 / -1' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                        <Package size={14} /> Costo del Producto ($)
-                    </label>
-                    <input 
-                        type="number" 
-                        value={draft.productCost}
-                        onChange={e => updateDraft(tender.id, 'productCost', e.target.value)}
-                        placeholder="Ej. 50000"
-                        style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '8px', borderRadius: '4px' }}
-                    />
-                </div>
-                <div style={{ gridColumn: '1 / -1' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                        <ExternalLink size={14} /> Enlace del Proveedor (Guardado Interno)
-                    </label>
-                    <input 
-                        type="text" 
-                        value={draft.supplierLink}
-                        onChange={e => updateDraft(tender.id, 'supplierLink', e.target.value)}
-                        placeholder="https://..."
-                        style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '8px', borderRadius: '4px' }}
-                    />
-                </div>
+                {!expandedQuoters[tender.id] && (
+                    <>
+                        <div style={{ gridColumn: '1 / -1' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                                <Package size={14} /> Costo del Producto ($) (Global)
+                            </label>
+                            <input 
+                                type="number" 
+                                value={draft.productCost}
+                                onChange={e => updateDraft(tender.id, 'productCost', e.target.value)}
+                                placeholder="Ej. 50000"
+                                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '8px', borderRadius: '4px' }}
+                            />
+                        </div>
+                        <div style={{ gridColumn: '1 / -1' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                                <ExternalLink size={14} /> Enlace del Proveedor (Guardado Interno)
+                            </label>
+                            <input 
+                                type="text" 
+                                value={draft.supplierLink}
+                                onChange={e => updateDraft(tender.id, 'supplierLink', e.target.value)}
+                                placeholder="https://..."
+                                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '8px', borderRadius: '4px' }}
+                            />
+                        </div>
+                        <div>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                                <Percent size={14} /> Margen Ganancia (Global)
+                            </label>
+                            <input 
+                                type="number" 
+                                value={draft.margin}
+                                onChange={e => updateDraft(tender.id, 'margin', e.target.value)}
+                                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '8px', borderRadius: '4px' }}
+                            />
+                        </div>
+                    </>
+                )}
 
                 <div>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>
@@ -424,18 +575,6 @@ export default function PostulationsView({ selectedTenders, onToggleSelection, o
                         value={draft.shippingCost}
                         onChange={e => updateDraft(tender.id, 'shippingCost', e.target.value)}
                         placeholder="Ej. 5000"
-                        style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '8px', borderRadius: '4px' }}
-                    />
-                </div>
-
-                <div>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                        <Percent size={14} /> Margen Ganancia
-                    </label>
-                    <input 
-                        type="number" 
-                        value={draft.margin}
-                        onChange={e => updateDraft(tender.id, 'margin', e.target.value)}
                         style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '8px', borderRadius: '4px' }}
                     />
                 </div>

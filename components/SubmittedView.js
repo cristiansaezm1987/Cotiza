@@ -140,28 +140,72 @@ export default function SubmittedView({ submittedBids, onStatusChange }) {
                         <p style={{ margin: '0 0 20px 0', color: 'var(--text-secondary)' }}>{selectedItem.name}</p>
                         
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
-                            <div>
-                                <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-secondary)', marginBottom: '5px', fontSize: '0.85rem' }}>
-                                    <Package size={16} /> Costo Producto
-                                </span>
-                                <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
-                                    ${Number(selectedItem.postulationDraft?.productCost || 0).toLocaleString('es-CL')}
-                                </div>
-                            </div>
+                            {/* Resumen Global (Fallback o Totales) */}
+                            {(!selectedItem.postulationDraft?.itemsData || selectedItem.postulationDraft.itemsData.length === 0) ? (
+                                <>
+                                    <div>
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-secondary)', marginBottom: '5px', fontSize: '0.85rem' }}>
+                                            <Package size={16} /> Costo Producto
+                                        </span>
+                                        <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
+                                            ${Number(selectedItem.postulationDraft?.productCost || 0).toLocaleString('es-CL')}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-secondary)', marginBottom: '5px', fontSize: '0.85rem' }}>
+                                            <Percent size={16} /> Margen Aplicado
+                                        </span>
+                                        <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#8b5cf6' }}>
+                                            {selectedItem.postulationDraft?.margin || 0}%
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div style={{ gridColumn: '1 / -1', background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '8px' }}>
+                                        <h4 style={{ margin: '0 0 10px', color: '#60a5fa', fontSize: '1rem' }}>Desglose por Ítem (Motor Cotizador)</h4>
+                                        <div style={{ overflowX: 'auto' }}>
+                                            <table style={{ width: '100%', fontSize: '0.85rem', textAlign: 'left', borderCollapse: 'collapse' }}>
+                                                <thead>
+                                                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                                                        <th style={{ padding: '8px', color: '#9ca3af' }}>Requerimiento</th>
+                                                        <th style={{ padding: '8px', color: '#9ca3af' }}>Selección</th>
+                                                        <th style={{ padding: '8px', color: '#9ca3af' }}>Costo U.</th>
+                                                        <th style={{ padding: '8px', color: '#9ca3af' }}>Margen</th>
+                                                        <th style={{ padding: '8px', color: '#9ca3af' }}>Total</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {selectedItem.postulationDraft.itemsData.map((item, idx) => (
+                                                        <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                                            <td style={{ padding: '8px', maxWidth: '150px' }}>
+                                                                <div style={{ fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={item.nombre}>{item.nombre}</div>
+                                                                <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Cant: {item.qty}</div>
+                                                            </td>
+                                                            <td style={{ padding: '8px', maxWidth: '180px' }}>
+                                                                <div style={{ color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={item.selectedTitle}>{item.selectedTitle || 'N/A'}</div>
+                                                                {item.link && (
+                                                                    <a href={item.link} target="_blank" rel="noreferrer" style={{ color: '#3b82f6', fontSize: '0.75rem', textDecoration: 'none' }}><ExternalLink size={10} style={{display:'inline'}}/> Link</a>
+                                                                )}
+                                                            </td>
+                                                            <td style={{ padding: '8px', color: 'white' }}>${(item.unitCost || 0).toLocaleString('es-CL')}</td>
+                                                            <td style={{ padding: '8px', color: '#8b5cf6' }}>{item.marginPct}%</td>
+                                                            <td style={{ padding: '8px', color: '#10b981', fontWeight: 'bold' }}>${(item.totalFinalPrice || 0).toLocaleString('es-CL')}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+
                             <div>
                                 <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-secondary)', marginBottom: '5px', fontSize: '0.85rem' }}>
                                     <Truck size={16} /> Costo Envío
                                 </span>
                                 <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
                                     ${Number(selectedItem.postulationDraft?.shippingCost || 0).toLocaleString('es-CL')}
-                                </div>
-                            </div>
-                            <div>
-                                <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-secondary)', marginBottom: '5px', fontSize: '0.85rem' }}>
-                                    <Percent size={16} /> Margen Aplicado
-                                </span>
-                                <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#8b5cf6' }}>
-                                    {selectedItem.postulationDraft?.margin || 0}%
                                 </div>
                             </div>
                             <div>
@@ -174,7 +218,7 @@ export default function SubmittedView({ submittedBids, onStatusChange }) {
                             </div>
                         </div>
 
-                        {selectedItem.postulationDraft?.supplierLink && (
+                        {(!selectedItem.postulationDraft?.itemsData || selectedItem.postulationDraft.itemsData.length === 0) && selectedItem.postulationDraft?.supplierLink && (
                             <div style={{ marginTop: '25px', padding: '15px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
                                 <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Enlace del Proveedor:</h4>
                                 <a 

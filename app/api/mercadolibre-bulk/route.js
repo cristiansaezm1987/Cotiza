@@ -24,8 +24,8 @@ export async function POST(request) {
 
             const data = await res.json();
             
-            // Tomamos los top 3 de meli_results
-            const results = (data.meli_results || []).slice(0, 3).map(item => ({
+            // Tomamos los top 10 de meli_results
+            const results = (data.meli_results || []).slice(0, 10).map(item => ({
                 id: `django-${Math.random()}`,
                 title: item.title,
                 description: item.raw_shipping || 'Encontrado por MeliPulse Django',
