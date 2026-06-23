@@ -1,3 +1,4 @@
+import React, { useState } from 'react';
 import { Package, Truck, Percent, Calculator, ExternalLink, TrendingUp, CheckCircle, XCircle, Clock, Copy, Download, Trash2 } from 'lucide-react';
 import { generatePDF } from '../lib/pdfGenerator';
 
