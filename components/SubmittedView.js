@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
-import { Package, Truck, Percent, Calculator, ExternalLink, TrendingUp, CheckCircle, XCircle, Clock, Copy, Download } from 'lucide-react';
+import { Package, Truck, Percent, Calculator, ExternalLink, TrendingUp, CheckCircle, XCircle, Clock, Copy, Download, Trash2 } from 'lucide-react';
 import { generatePDF } from '../lib/pdfGenerator';
 
-export default function SubmittedView({ submittedBids, onStatusChange }) {
+export default function SubmittedView({ submittedBids, onStatusChange, onDeleteBid }) {
     const [selectedItem, setSelectedItem] = useState(null);
 
     // Calculate stats
@@ -80,62 +79,93 @@ export default function SubmittedView({ submittedBids, onStatusChange }) {
                                 <th style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>ID Licitación</th>
                                 <th style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>Fecha</th>
                                 <th style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>Monto Cotizado</th>
-                                <th style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>Margen</th>
+                                <th style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>Margen Real</th>
                                 <th style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>Estado</th>
                                 <th style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>Cotización PDF</th>
+                                <th style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}></th>
                             </tr>
                         </thead>
                         <tbody>
-                            {submittedBids.map((bid) => (
-                                <tr 
-                                    key={bid.id} 
-                                    onClick={() => setSelectedItem(selectedItem?.id === bid.id ? null : bid)}
-                                    style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', transition: '0.2s', cursor: 'pointer', background: selectedItem?.id === bid.id ? 'rgba(255,255,255,0.05)' : 'transparent' }}
-                                >
-                                    <td style={{ padding: '15px 10px', color: '#60a5fa', fontWeight: 'bold' }}>{bid.id}</td>
-                                    <td style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>{bid.biddedDate || 'N/A'}</td>
-                                    <td style={{ padding: '15px 10px', color: '#10b981', fontWeight: 'bold' }}>
-                                        ${(bid.biddedPrice || 0).toLocaleString('es-CL')}
-                                    </td>
-                                    <td style={{ padding: '15px 10px', color: '#8b5cf6' }}>{bid.biddedMargin || 0}%</td>
-                                    <td style={{ padding: '15px 10px' }}>
-                                        <select 
-                                            value={bid.bidStatus || 'postulada'} 
-                                            onClick={(e) => e.stopPropagation()}
-                                            onChange={(e) => handleStatusChange(bid, e.target.value)}
-                                            style={{ 
-                                                background: bid.bidStatus === 'ganada' ? 'rgba(16, 185, 129, 0.2)' : 
-                                                            bid.bidStatus === 'perdida' ? 'rgba(239, 68, 68, 0.2)' : 
-                                                            'rgba(59, 130, 246, 0.2)', 
-                                                color: bid.bidStatus === 'ganada' ? '#10b981' : 
-                                                       bid.bidStatus === 'perdida' ? '#ef4444' : 
-                                                       '#3b82f6',
-                                                border: 'none', padding: '5px 10px', borderRadius: '5px', outline: 'none', cursor: 'pointer', fontWeight: 'bold'
-                                            }}
-                                        >
-                                            <option value="postulada">En Espera</option>
-                                            <option value="ganada">Ganada</option>
-                                            <option value="perdida">Perdida</option>
-                                        </select>
-                                    </td>
-                                    <td style={{ padding: '15px 10px' }}>
-                                        <button 
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                const finalCalc = {
-                                                    finalProduct: selectedItem?.postulationDraft?.productCost || 0,
-                                                    finalShipping: selectedItem?.postulationDraft?.shippingCost || 0,
-                                                    total: bid.biddedPrice || 0
-                                                };
-                                                generatePDF(bid, bid.postulationDraft || {}, finalCalc);
-                                            }}
-                                            style={{ background: 'none', border: 'none', color: '#60a5fa', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}
-                                        >
-                                            <Download size={16} /> PDF
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
+                            {submittedBids.map((bid) => {
+                                // Calcular margen real
+                                let realMargin = 0;
+                                const draft = bid.postulationDraft || {};
+                                if (draft.itemsData && draft.itemsData.length > 0) {
+                                    let totalCost = Number(draft.shippingCost) || 0;
+                                    draft.itemsData.forEach(item => { totalCost += (item.unitCost || 0) * (item.qty || 1); });
+                                    const totalBidded = bid.biddedPrice || 0;
+                                    if (totalCost > 0) {
+                                        realMargin = Math.round(((totalBidded - totalCost) / totalCost) * 100);
+                                    }
+                                } else {
+                                    realMargin = draft.margin || 0;
+                                }
+
+                                return (
+                                    <tr 
+                                        key={bid.id} 
+                                        onClick={() => setSelectedItem(selectedItem?.id === bid.id ? null : bid)}
+                                        style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', transition: '0.2s', cursor: 'pointer', background: selectedItem?.id === bid.id ? 'rgba(255,255,255,0.05)' : 'transparent' }}
+                                    >
+                                        <td style={{ padding: '15px 10px', color: '#60a5fa', fontWeight: 'bold' }}>{bid.id}</td>
+                                        <td style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>{bid.biddedDate || 'N/A'}</td>
+                                        <td style={{ padding: '15px 10px', color: '#10b981', fontWeight: 'bold' }}>
+                                            ${(bid.biddedPrice || 0).toLocaleString('es-CL')}
+                                        </td>
+                                        <td style={{ padding: '15px 10px', color: '#8b5cf6' }}>{realMargin}%</td>
+                                        <td style={{ padding: '15px 10px' }}>
+                                            <select 
+                                                value={bid.bidStatus || 'postulada'} 
+                                                onClick={(e) => e.stopPropagation()}
+                                                onChange={(e) => handleStatusChange(bid, e.target.value)}
+                                                style={{ 
+                                                    background: bid.bidStatus === 'ganada' ? 'rgba(16, 185, 129, 0.2)' : 
+                                                                bid.bidStatus === 'perdida' ? 'rgba(239, 68, 68, 0.2)' : 
+                                                                'rgba(59, 130, 246, 0.2)', 
+                                                    color: bid.bidStatus === 'ganada' ? '#10b981' : 
+                                                           bid.bidStatus === 'perdida' ? '#ef4444' : 
+                                                           '#3b82f6',
+                                                    border: 'none', padding: '5px 10px', borderRadius: '5px', outline: 'none', cursor: 'pointer', fontWeight: 'bold'
+                                                }}
+                                            >
+                                                <option value="postulada">En Espera</option>
+                                                <option value="ganada">Ganada</option>
+                                                <option value="perdida">Perdida</option>
+                                            </select>
+                                        </td>
+                                        <td style={{ padding: '15px 10px' }}>
+                                            <button 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    const finalCalc = {
+                                                        finalProduct: draft.productCost || 0,
+                                                        finalShipping: draft.shippingCost || 0,
+                                                        total: bid.biddedPrice || 0
+                                                    };
+                                                    generatePDF(bid, draft, finalCalc);
+                                                }}
+                                                style={{ background: 'none', border: 'none', color: '#60a5fa', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                            >
+                                                <Download size={16} /> PDF
+                                            </button>
+                                        </td>
+                                        <td style={{ padding: '15px 10px' }}>
+                                            <button 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (window.confirm('¿Estás seguro de que deseas eliminar esta licitación de la lista?')) {
+                                                        if (onDeleteBid) onDeleteBid(bid);
+                                                    }
+                                                }}
+                                                style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', opacity: 0.7 }}
+                                                title="Eliminar Postulación"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 )}

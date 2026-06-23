@@ -215,6 +215,15 @@ export default function Dashboard() {
       }).catch(console.error);
   };
 
+  const handleRemoveBid = (tender) => {
+      setSubmittedBids(prev => prev.filter(t => t.id !== tender.id));
+      fetch('/api/postulations/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: tender.id })
+      }).catch(console.error);
+  };
+
   useEffect(() => {
     isSyncPausedRef.current = isSyncPaused;
   }, [isSyncPaused]);
@@ -806,6 +815,7 @@ export default function Dashboard() {
           <SubmittedView 
               submittedBids={submittedBids} 
               onStatusChange={handleBidStatusChange} 
+              onDeleteBid={handleRemoveBid}
           />
       )}
       
