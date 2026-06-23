@@ -15,7 +15,8 @@ export async function POST(request) {
     // Ejecutamos las búsquedas en paralelo usando Promise.all para mayor velocidad
     const searchPromises = queries.map(async (query, index) => {
         try {
-            const res = await fetch(`http://127.0.0.1:8000/api/search/?q=${encodeURIComponent(query)}`);
+            const djangoUrl = process.env.MELIPULSE_API_URL || 'http://127.0.0.1:8000';
+            const res = await fetch(`${djangoUrl}/api/search/?q=${encodeURIComponent(query)}`);
             
             if (!res.ok) {
                 console.error(`Django API error for query ${query}: ${res.status}`);
