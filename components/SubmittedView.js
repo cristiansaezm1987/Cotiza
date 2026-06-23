@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Package, Truck, Percent, Calculator, ExternalLink, TrendingUp, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Package, Truck, Percent, Calculator, ExternalLink, TrendingUp, CheckCircle, XCircle, Clock, Copy, Download } from 'lucide-react';
+import { generatePDF } from '../lib/pdfGenerator';
 
 export default function SubmittedView({ submittedBids, onStatusChange }) {
     const [selectedItem, setSelectedItem] = useState(null);
@@ -81,6 +82,7 @@ export default function SubmittedView({ submittedBids, onStatusChange }) {
                                 <th style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>Monto Cotizado</th>
                                 <th style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>Margen</th>
                                 <th style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>Estado</th>
+                                <th style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>Cotización PDF</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -116,6 +118,22 @@ export default function SubmittedView({ submittedBids, onStatusChange }) {
                                             <option value="perdida">Perdida</option>
                                         </select>
                                     </td>
+                                    <td style={{ padding: '15px 10px' }}>
+                                        <button 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                const finalCalc = {
+                                                    finalProduct: selectedItem?.postulationDraft?.productCost || 0,
+                                                    finalShipping: selectedItem?.postulationDraft?.shippingCost || 0,
+                                                    total: bid.biddedPrice || 0
+                                                };
+                                                generatePDF(bid, bid.postulationDraft || {}, finalCalc);
+                                            }}
+                                            style={{ background: 'none', border: 'none', color: '#60a5fa', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                        >
+                                            <Download size={16} /> PDF
+                                        </button>
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
@@ -136,7 +154,16 @@ export default function SubmittedView({ submittedBids, onStatusChange }) {
                         >
                             &times;
                         </button>
-                        <h3 style={{ margin: '0 0 15px 0', color: '#3b82f6' }}>Detalle de Licitación: {selectedItem.id}</h3>
+                        <h3 style={{ margin: '0 0 15px 0', color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            Detalle de Licitación: {selectedItem.id}
+                            <button 
+                                onClick={() => navigator.clipboard.writeText(selectedItem.id)}
+                                style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px', borderRadius: '4px', display: 'flex', alignItems: 'center' }}
+                                title="Copiar ID"
+                            >
+                                <Copy size={14} />
+                            </button>
+                        </h3>
                         <p style={{ margin: '0 0 20px 0', color: 'var(--text-secondary)' }}>{selectedItem.name}</p>
                         
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
@@ -231,6 +258,25 @@ export default function SubmittedView({ submittedBids, onStatusChange }) {
                                 </a>
                             </div>
                         )}
+
+                        <div style={{ marginTop: '25px', display: 'flex', justifyContent: 'flex-end' }}>
+                            <button 
+                                onClick={() => {
+                                    const finalCalc = {
+                                        finalProduct: selectedItem.postulationDraft?.productCost || 0,
+                                        finalShipping: selectedItem.postulationDraft?.shippingCost || 0,
+                                        total: selectedItem.biddedPrice || 0
+                                    };
+                                    generatePDF(selectedItem, selectedItem.postulationDraft || {}, finalCalc);
+                                }}
+                                style={{ 
+                                    background: '#3b82f6', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '6px', 
+                                    fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' 
+                                }}
+                            >
+                                <Download size={18} /> Descargar PDF Cotización
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
