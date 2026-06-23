@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Package, Truck, Percent, Calculator, ExternalLink, TrendingUp, CheckCircle, XCircle, Clock, Copy, Download, Trash2 } from 'lucide-react';
+import { Package, Truck, Percent, Calculator, ExternalLink, TrendingUp, CheckCircle, XCircle, Clock, Copy, Download, Trash2, Edit } from 'lucide-react';
 import { generatePDF } from '../lib/pdfGenerator';
 
-export default function SubmittedView({ submittedBids, onStatusChange, onDeleteBid }) {
+export default function SubmittedView({ submittedBids, onStatusChange, onDeleteBid, onEditBid }) {
     const [selectedItem, setSelectedItem] = useState(null);
 
     // Calculate stats
@@ -84,6 +84,7 @@ export default function SubmittedView({ submittedBids, onStatusChange, onDeleteB
                                 <th style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>Estado</th>
                                 <th style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}>Cotización PDF</th>
                                 <th style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}></th>
+                                <th style={{ padding: '15px 10px', color: 'var(--text-secondary)' }}></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -148,6 +149,18 @@ export default function SubmittedView({ submittedBids, onStatusChange, onDeleteB
                                                 style={{ background: 'none', border: 'none', color: '#60a5fa', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}
                                             >
                                                 <Download size={16} /> PDF
+                                            </button>
+                                        </td>
+                                        <td style={{ padding: '15px 10px' }}>
+                                            <button 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (onEditBid) onEditBid(bid);
+                                                }}
+                                                style={{ background: 'none', border: 'none', color: '#f59e0b', cursor: 'pointer', opacity: 0.8 }}
+                                                title="Editar Licitación"
+                                            >
+                                                <Edit size={18} />
                                             </button>
                                         </td>
                                         <td style={{ padding: '15px 10px' }}>

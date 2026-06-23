@@ -224,6 +224,34 @@ export default function Dashboard() {
       }).catch(console.error);
   };
 
+  const handleEditBid = (tender) => {
+      setSubmittedBids(prev => prev.filter(t => t.id !== tender.id));
+      
+      setSelectedTenders(prev => {
+          if (!prev.find(t => t.id === tender.id)) return [tender, ...prev];
+          return prev;
+      });
+      
+      setDrafts(prev => {
+          if (tender.postulationDraft) {
+              return { ...prev, [tender.id]: tender.postulationDraft };
+          }
+          return prev;
+      });
+      
+      setActiveTab('postulations');
+      
+      fetch('/api/postulations/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+              id: tender.id, 
+              isBidded: false,
+              isPostulated: true
+          })
+      }).catch(console.error);
+  };
+
   useEffect(() => {
     isSyncPausedRef.current = isSyncPaused;
   }, [isSyncPaused]);
@@ -816,6 +844,7 @@ export default function Dashboard() {
               submittedBids={submittedBids} 
               onStatusChange={handleBidStatusChange} 
               onDeleteBid={handleRemoveBid}
+              onEditBid={handleEditBid}
           />
       )}
       
