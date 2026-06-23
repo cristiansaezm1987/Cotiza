@@ -240,6 +240,7 @@ export default function Dashboard() {
       });
       
       setActiveTab('postulations');
+      window.alert('La licitación ha vuelto a estado "Borrador" y fue enviada a la pestaña de Postulaciones (Espera) para que puedas editarla.');
       
       fetch('/api/postulations/save', {
           method: 'POST',

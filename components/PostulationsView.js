@@ -317,6 +317,21 @@ const IntelligentWidget = ({ tender, onUpdateQuoter }) => {
 export default function PostulationsView({ selectedTenders, onToggleSelection, onMarkBidded, onOpenDetail }) {
   const [drafts, setDrafts] = useState({});
   const [expandedQuoters, setExpandedQuoters] = useState({});
+
+  useEffect(() => {
+      const newExpanded = { ...expandedQuoters };
+      let changed = false;
+      selectedTenders.forEach(t => {
+          const draft = drafts[t.id];
+          if (draft && draft.itemsData && draft.itemsData.length > 0 && newExpanded[t.id] === undefined) {
+              newExpanded[t.id] = true;
+              changed = true;
+          }
+      });
+      if (changed) {
+          setExpandedQuoters(newExpanded);
+      }
+  }, [selectedTenders, drafts]);
   const debounceRef = React.useRef({});
 
   // Initialize drafts for newly selected tenders
