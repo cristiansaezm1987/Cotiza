@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Truck, Percent, Calculator, FileText, Download, Trash2, ExternalLink, Copy, Search, ExternalLink as ExtLink } from 'lucide-react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { Package, Truck, Percent, Calculator, FileText, Download, Trash2, ExternalLink, Copy, Search, ExternalLink as ExtLink, CheckCircle } from 'lucide-react';
 
 const IntelligentWidget = ({ tender, onUpdateQuoter }) => {
     const [items, setItems] = useState([]);
