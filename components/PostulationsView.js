@@ -137,8 +137,11 @@ const IntelligentWidget = ({ tender, onUpdateQuoter }) => {
 
     const handleSelect = (idx, prod) => {
         setSelectedMap(prev => ({ ...prev, [idx]: prod }));
-        // Clear custom input if they select a suggested product
-        setCustomInputs(prev => ({ ...prev, [idx]: { ...prev[idx], price: '' } }));
+        // Populate the manual inputs so the user can see/edit the selected product's details
+        setCustomInputs(prev => ({ 
+            ...prev, 
+            [idx]: { title: prod.title, link: prod.permalink, price: prod.price } 
+        }));
     };
 
     const handleManualSearch = async (idx) => {
@@ -251,7 +254,7 @@ const IntelligentWidget = ({ tender, onUpdateQuoter }) => {
                     )}
                     
                     <div style={{marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.1)'}}>
-                        <div style={{fontSize: '0.8rem', color: '#9ca3af', marginBottom: '5px'}}>O si prefieres, completa este ítem manualmente:</div>
+                        <div style={{fontSize: '0.8rem', color: '#9ca3af', marginBottom: '5px'}}>Detalles de cotización para este ítem (editable):</div>
                         <div style={{display: 'flex', gap: '10px'}}>
                             <input 
                                 type="text" 
