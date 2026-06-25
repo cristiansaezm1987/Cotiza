@@ -708,7 +708,7 @@ export default function Dashboard() {
             <div style={{ background: 'rgba(0,0,0,0.2)', padding: '10px 14px', borderRadius: '8px', borderLeft: '4px solid #10b981' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#10b981', marginBottom: '4px', fontWeight: 'bold' }}>
                     <span>Estado: Base Excel (Segundos Llamados)</span>
-                    <span>{dbStats.base2?.totalCount !== undefined ? `${dbStats.base2.totalCount} licitaciones en Nube (Turso)` : 'Guardado en Nube (Turso)'}</span>
+                    <span>{dbStats.base2?.totalCount !== undefined ? `${dbStats.base2.totalCount} licitaciones en Base Local` : 'Guardado en Base Local'}</span>
                 </div>
                 {syncStatus.excel && syncStatus.excel.active ? (
                     <>
