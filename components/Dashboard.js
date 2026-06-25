@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, Zap, List, BookOpen, CheckCircle, Activity, Download } from 'lucide-react';
+import { Play, Pause, Zap, List, BookOpen, CheckCircle, Activity, Download, Settings } from 'lucide-react';
 import Filters from './Filters';
 import DataTable from './DataTable';
 import RefreshButton from './RefreshButton';
@@ -10,6 +10,7 @@ import Top20View from './Top20View';
 import MarketIntelligenceView from './MarketIntelligenceView';
 import PostulationsView from './PostulationsView';
 import SubmittedView from './SubmittedView';
+import SettingsView from './SettingsView';
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('explorer');
@@ -224,31 +225,28 @@ export default function Dashboard() {
       }).catch(console.error);
   };
 
-  const handleEditBid = (tender) => {
-      setSubmittedBids(prev => prev.filter(t => t.id !== tender.id));
-      
-      setSelectedTenders(prev => {
-          if (!prev.find(t => t.id === tender.id)) return [tender, ...prev];
-          return prev;
-      });
-      
-      setDrafts(prev => {
-          if (tender.postulationDraft) {
-              return { ...prev, [tender.id]: tender.postulationDraft };
+  const handleUpdateBid = (tenderId, updatedDraft, calc) => {
+      setSubmittedBids(prev => prev.map(t => {
+          if (t.id === tenderId) {
+              return {
+                  ...t,
+                  biddedPrice: calc.total,
+                  biddedMargin: updatedDraft.margin || 0,
+                  postulationDraft: updatedDraft
+              };
           }
-          return prev;
-      });
-      
-      setActiveTab('postulations');
-      window.alert('La licitación ha vuelto a estado "Borrador" y fue enviada a la pestaña de Postulaciones (Espera) para que puedas editarla.');
+          return t;
+      }));
       
       fetch('/api/postulations/save', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
-              id: tender.id, 
-              isBidded: false,
-              isPostulated: true
+              id: tenderId, 
+              isBidded: true,
+              biddedPrice: calc.total,
+              biddedMargin: updatedDraft.margin || 0,
+              draft: updatedDraft
           })
       }).catch(console.error);
   };
@@ -584,12 +582,26 @@ export default function Dashboard() {
           >
               <CheckCircle size={18} /> Licitaciones Postuladas
           </button>
+          
+          <button
+              onClick={() => setActiveTab('settings')}
+              style={{
+                  padding: '12px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 'bold', transition: '0.2s',
+                  background: activeTab === 'settings' ? 'var(--primary-color)' : 'transparent',
+                  color: activeTab === 'settings' ? 'white' : 'var(--text-secondary)',
+                  justifyContent: 'flex-start'
+              }}
+          >
+              <Settings size={18} /> Configuración
+          </button>
       </div>
 
       {/* MAIN CONTENT AREA */}
-      <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0 }}>
+      <div style={{ flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '20px' }}>
         
-        {error && (
+        {activeTab === 'settings' && <SettingsView />}
+        {activeTab === 'explorer' && error && (
           <div style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '15px', borderRadius: '12px', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
             <span style={{ color: 'var(--danger-color)', fontSize: '0.9rem', fontWeight: 'bold' }}>{error}</span>
           </div>
@@ -819,6 +831,7 @@ export default function Dashboard() {
               <Top20View 
                  data={vettedData.filter(item => {
                      if (submittedBids.some(b => b.id === item.id)) return false;
+                     if (item.closeDate && new Date(item.closeDate) < new Date()) return false;
                      const cNum = Number(item.callNumber) || 1;
                      if (activeTab === 'suggested-1' && cNum !== 1) return false;
                      if (activeTab === 'suggested-2' && cNum !== 2) return false;
@@ -845,7 +858,7 @@ export default function Dashboard() {
               submittedBids={submittedBids} 
               onStatusChange={handleBidStatusChange} 
               onDeleteBid={handleRemoveBid}
-              onEditBid={handleEditBid}
+              onUpdateBid={handleUpdateBid}
           />
       )}
       

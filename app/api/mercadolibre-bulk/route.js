@@ -12,42 +12,55 @@ export async function POST(request) {
 
     const finalMap = {};
 
-    // Ejecutamos las búsquedas en paralelo usando Promise.all para mayor velocidad
-    const searchPromises = queries.map(async (query, index) => {
+    // Ejecutamos las búsquedas de forma secuencial (o en lotes pequeños) para no saturar el servidor de desarrollo Django local
+    const resolvedSearches = [];
+    for (let i = 0; i < queries.length; i++) {
+        const query = queries[i];
         try {
             const djangoUrl = process.env.MELIPULSE_API_URL || 'http://127.0.0.1:8000';
-            const res = await fetch(`${djangoUrl}/api/search/?q=${encodeURIComponent(query)}`);
             
-            if (!res.ok) {
-                console.error(`Django API error for query ${query}: ${res.status}`);
-                return { index, results: [] };
+            const fetchFromDjango = async (q) => {
+                const res = await fetch(`${djangoUrl}/api/search/?q=${encodeURIComponent(q)}`);
+                if (!res.ok) return [];
+                const data = await res.json();
+                return (data.meli_results || []).slice(0, 10).map(item => ({
+                    id: `django-${Math.random()}`,
+                    title: item.title,
+                    description: item.raw_shipping || 'Encontrado por MeliPulse Django',
+                    price: item.price || 0,
+                    currency: item.currency || 'CLP',
+                    thumbnail: item.image || 'https://http2.mlstatic.com/frontend-assets/ui-navigation/5.19.1/mercadolibre/logo__small.png',
+                    permalink: item.permalink,
+                    condition: 'new',
+                    shipping: item.free_shipping ? 'Envío gratis' : 'Calculado',
+                    source: 'MeliPulse Django'
+                }));
+            };
+
+            let results = await fetchFromDjango(query);
+            
+            if (results.length === 0) {
+                let cleaned = query.replace(/\b(original|nuevo|alternativo|compatible|genuino|unidad|de|para)\b/gi, '').replace(/\s+/g, ' ').trim();
+                if (cleaned && cleaned !== query) {
+                    results = await fetchFromDjango(cleaned);
+                }
+                if (results.length === 0) {
+                    let words = (cleaned || query).split(' ');
+                    while (words.length > 2 && results.length === 0) {
+                        words.pop();
+                        results = await fetchFromDjango(words.join(' '));
+                    }
+                }
             }
 
-            const data = await res.json();
-            
-            // Tomamos los top 10 de meli_results
-            const results = (data.meli_results || []).slice(0, 10).map(item => ({
-                id: `django-${Math.random()}`,
-                title: item.title,
-                description: item.raw_shipping || 'Encontrado por MeliPulse Django',
-                price: item.price || 0,
-                currency: item.currency || 'CLP',
-                thumbnail: item.image || 'https://http2.mlstatic.com/frontend-assets/ui-navigation/5.19.1/mercadolibre/logo__small.png',
-                permalink: item.permalink,
-                condition: 'new',
-                shipping: item.free_shipping ? 'Envío gratis' : 'Calculado',
-                source: 'MeliPulse Django'
-            }));
-
-            return { index, results };
+            resolvedSearches.push({ index: i, results });
         } catch (err) {
             console.error(`Fetch error for query ${query}:`, err);
-            return { index, results: [] };
+            resolvedSearches.push({ index: i, results: [] });
         }
-    });
+    }
 
-    const resolvedSearches = await Promise.all(searchPromises);
-
+    // Fix Turbopack cache issue
     resolvedSearches.forEach(search => {
         finalMap[search.index] = search.results;
     });
